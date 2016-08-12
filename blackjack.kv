@@ -1,0 +1,24 @@
+<Screen>:
+    canvas:
+        Color:
+            rgb: 0, 0, 0
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    Button:
+        text: 'Press!'
+        font_size: 20
+        size_hint: 0.1, None
+        height: '50dp'
+        pos_hint: {'top': 1}
+        on_press: root.show_card()
+    BoxLayout:
+        orientation: 'vertical'
+        BoxLayout:
+            Image:
+                source: root.file
+            Image:
+                source: root.file1
+        BoxLayout:
+            Image:
+                source: root.file1
