@@ -11,11 +11,13 @@ from kivy.properties import StringProperty
 class Screen(BoxLayout):
     file = StringProperty()
     file1 = StringProperty()
+    file2 = StringProperty()
     def __init__ (self, **kwargs):
         super(Screen, self).__init__(**kwargs)
         self.shoe = Shoe()  
     def show_card(self):
         c = self.shoe.contents.pop()
+        self.file2 = self.file1
         self.file1 = self.file
         self.file = './Cards/'+c.rank.lower()+'_'+c.suit.lower()+'.png'
        

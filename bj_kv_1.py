@@ -5,7 +5,13 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
 from blackjack import *
 
-class Screen_1(BoxLayout):
+class CardView(BoxLayout):
+    pass
+
+class PlayArea(BoxLayout):
+    pass
+
+class Screen(BoxLayout):
     orientation = 'vertical'
     def __init__ (self, **kwargs):
         super().__init__(**kwargs)
@@ -13,32 +19,32 @@ class Screen_1(BoxLayout):
         player_screen = BoxLayout()
 
 
-        #define_shoe()
         shoe = Shoe()
-        #define_player()
         player = Player()
         player_hand = Hand(bet=5, shoe=shoe)
-        #define_dealer()
         dealer = Dealer(shoe=shoe)
         player_hand.deal()
         player.hands.append(player_hand)
-        #player.play(player_hand, dealer=dealer)
-        #dealer.play()
+        dealer_screen = CardView()
+        player_screen = CardView()
+        pa = PlayArea()
 
+        self.k_play(dealer_screen, dealer.hand)
+        self.k_play(player_screen, player_hand)
         
-        dealer_screen.add_widget(self.k_play(dealer.hand))        
-        player_screen.add_widget(self.k_play(player_hand))
+        #dealer_screen.add_widget(self.k_play(dealer.hand))        
+        #player_screen.add_widget(self.k_play(player_hand))
 
-        self.add_widget(dealer_screen)
-        self.add_widget(player_screen)	
+        pa.add_widget(dealer_screen)
+        pa.add_widget(player_screen)	
+        self.add_widget(pa)
        
 
                
-    def k_play(self, hand):
-        x = FloatLayout()
+    def k_play(self, screen, hand):
         for i in hand.cards:
-            x.add_widget(i.image)
-        return x
+            screen.add_widget(i.image)
+        return
 
 
 
@@ -56,10 +62,10 @@ class Screen_1(BoxLayout):
 """
 
 
-class BlackjackApp(App):
+class BjApp(App):
     def build(self):
-        return Screen_1()
+        return Screen()
 
 
 if __name__ == '__main__':
-    BlackjackApp().run()
+    BjApp().run()

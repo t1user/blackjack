@@ -14,11 +14,21 @@
         on_press: root.show_card()
     BoxLayout:
         orientation: 'vertical'
+        size_hint_y: None
+        height: '350dp'
+        pos_hint: {'top': 1}
+        spacing: 25
+        padding: [10, 10, 10, 10]
         BoxLayout:
+            spacing: 10
+            size_hint_x: None
+            width: str(223 * len(self.children)) +'dp'
+            pos_hint_center_x: 'center'
             Image:
-                source: root.file
+                source: root.file 
             Image:
                 source: root.file1
-        BoxLayout:
+        BoxLayout:   
             Image:
-                source: root.file1
+                source: root.file2
+

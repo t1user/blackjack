@@ -1,0 +1,36 @@
+<Screen>:
+    canvas:
+        Color:
+            rgb: 0, 0, 0
+        Rectangle:
+            pos: self.pos
+            size: self.size
+        pos_hint_x: 'None'
+        pos_hint_y: 'None'
+        
+    Button:
+        text: 'Press!'
+        font_size: 20
+        size_hint: 0.1, None
+        height: '50dp'
+        pos_hint: {'top': 1}
+        #on_press: root.show_card()
+    
+  
+<PlayArea>:
+    orientation: 'vertical'
+    size_hint_y: None
+    height: '350dp'
+    pos_hint: {'top': 1}
+    spacing: 25
+    padding: [10, 10, 10, 10]
+
+<CardView>:
+    spacing: 10
+    size_hint_x: None
+    width: str(223 * len(self.children)) +'dp'
+    pos_hint_center_x: 'center'
+
+
+
+
