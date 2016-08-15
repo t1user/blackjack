@@ -1,35 +1,69 @@
 <Screen>:
-    canvas:
-        Color:
-            rgb: 0, 0, 0
-        Rectangle:
-            pos: self.pos
-            size: self.size
-        pos_hint_x: 'None'
-        pos_hint_y: 'None'
-        
+    orientation: 'vertical'
+    spacing: 10
+    padding: [5, 5, 5, 5]
+
+<InfoStrip>:
+    orientation: 'vertical'
+    size_hint_x: .10
+    spacing: 0
+    #padding: [1, 1, 1, 1]
     Button:
-        text: 'Press!'
-        font_size: 20
-        size_hint: 0.1, None
-        height: '50dp'
+        text: 'info area'
+        size_hint_y: None
+        size_hint_y: .20
         pos_hint: {'top': 1}
-        #on_press: root.show_card()
-    
-  
+    Label:
+        text: 'BET SIZE:'
+        size_hint_y: .10
+    Label:
+        text: str(bet_size.value)
+        font_size: '35dp'
+        size_hint_y: .15
+    Slider:
+        id: bet_size
+        size_hint_y: .55
+        orientation: 'vertical'
+        min: 25
+        max: 300
+        step: 25
+        value: 50
+
 <PlayArea>:
     orientation: 'vertical'
-    size_hint_y: None
-    height: '350dp'
-    pos_hint: {'top': 1}
-    spacing: 25
-    padding: [10, 10, 10, 10]
+    spacing: 5
+    padding: [5, 5, 5, 5]
 
 <CardView>:
-    spacing: 10
     size_hint_x: None
-    width: str(223 * len(self.children)) +'dp'
-    pos_hint_center_x: 'center'
+    width: str(125 * len(self.children)) +'dp'
+    size_hint_y: .5
+    #height: '375dp'
+    #pos: 300, 300
+    pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+    padding: [5, 5, 5, 5]
+    spacing: 5
+      
+<ButtonStrip>:
+    pos_hint: {'bottom': 0}
+    size_hint_y: 0.15
+    spacing: 5
+    padding: [10, 10, 10, 10]
+    Button:
+        text: 'DEAL'
+        size_hint_x: None
+        width: '65dp'
+    Label:
+        size_hint_x: None
+        width: '10dp'
+    Button:
+        text: 'Stay'
+    Button:
+        text: 'Split'
+    Button:
+        text: 'Double'
+    Button:
+        text: 'Hit'
 
 
 
