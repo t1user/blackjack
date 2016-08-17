@@ -25,16 +25,24 @@ class InfoStrip(BoxLayout):
 class Outer(BoxLayout):
     pass
 
+"""
+class PointLabel(Label):
+    pass
+
+class ScoreLabel(Label):
+    pass
+"""
+
 class Screen(BoxLayout):
     def __init__ (self, **kwargs):
         super().__init__(**kwargs)
 
         shoe = Shoe()
         player = Player()
-        player_hand = Hand(bet=5, shoe=shoe)
+        self.player_hand = Hand(bet=5, shoe=shoe)
         dealer = Dealer(shoe=shoe)
-        player_hand.deal()
-        player.hands.append(player_hand)
+        self.player_hand.deal()
+        player.hands.append(self.player_hand)
               
         dealer_screen = CardView()
         player_screen = CardView()
@@ -44,7 +52,7 @@ class Screen(BoxLayout):
         buttons = ButtonStrip()
 
         self.k_play(dealer_screen, dealer.hand)
-        self.k_play(player_screen, player_hand)
+        self.k_play(player_screen, self.player_hand)
         
         pa.add_widget(dealer_screen)
         pa.add_widget(player_screen)
@@ -57,6 +65,9 @@ class Screen(BoxLayout):
         for i in hand.cards:
             screen.add_widget(i.image)
         return
+    
+    def hit():
+        self.player_hand.deal()
 
 class BjApp(App):
     def build(self):
