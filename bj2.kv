@@ -1,0 +1,81 @@
+Screen:
+    Outer
+    ButtonStrip
+
+<Screen>:
+    orientation: 'vertical'
+    spacing: 5
+    padding: [5, 5, 5, 5]
+
+<Outer>:
+    size_hint_y: .85
+    pos_hint: {'top': 1}
+    InfoStrip
+    PlayArea
+
+<ButtonStrip>:
+    pos_hint: {'bottom': 0}
+    size_hint_y: .15
+    spacing: 5
+    padding: [10, 10, 10, 10]
+    Button:
+        text: 'DEAL'
+        size_hint_x: None
+        width: '65dp'
+    Label:
+        size_hint_x: None
+        width: '10dp'
+    Button:
+        text: 'Stay'
+    Button:
+        text: 'Split'
+    Button:
+        text: 'Double'
+    Button:
+        text: 'Hit'
+        on_press: root.hit()
+
+<InfoStrip>:
+    orientation: 'vertical'
+    size_hint_x: .10
+    padding: [1, 5, 1, 5]
+    Button:
+        text: 'info area'
+        size_hint_y: None
+        size_hint_y: .33
+        pos_hint: {'top': 1}
+    Label:
+        text: 'BET SIZE:'
+        size_hint_y: .10
+    Label:
+        text: str(bet_size.value)
+        font_size: '35dp'
+        size_hint_y: .02
+    Slider:
+        id: bet_size
+        size_hint_y: .55
+        orientation: 'vertical'
+        min: 25
+        max: 300
+        step: 25
+        value: 50
+
+<PlayArea>:
+    orientation: 'vertical'
+    spacing: 5
+    padding: [5, 5, 5, 5]
+
+<CardView>:
+    size_hint_x: None
+    width: str(125 * len(self.children)) +'dp'
+    size_hint_y: .5
+    #height: '375dp'
+    #pos: 300, 300
+    pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+    padding: [5, 5, 5, 5]
+    spacing: 5
+      
+
+
+
+

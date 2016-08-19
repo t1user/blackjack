@@ -91,6 +91,9 @@ class Hand:
         #shoe needs to be an instance of Shoe  
         shoe=self.shoe
         self.cards.append(shoe.contents.pop())
+        
+    def delete(self):
+        e = self.cards.pop()
 
     def set_played(self):
         self.played = True
