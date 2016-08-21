@@ -47,12 +47,20 @@ class PlayArea(BoxLayout):
         print(args)
 
 class Screen(BoxLayout):
-    pass
-             
-class Bj2App(App):
+    
+    playarea = ObjectProperty()
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
     def hit(self):
         player_hand.deal()
-        print(player_hand.cards)
+        playarea.playercards = player_hand.cards
+        
+             
+class Bj2App(App):
+    pass
+        
     
 if __name__ == '__main__':
     shoe = Shoe()

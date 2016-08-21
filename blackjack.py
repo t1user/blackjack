@@ -1,7 +1,6 @@
 
 import random
 import itertools
-from kivy.uix.image import Image
 
 SUITS = ['S', 'H', 'D', 'C']
 RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
@@ -11,7 +10,6 @@ class Card:
     def __init__(self, rank, suit):
         self.rank = rank
         self.suit = suit
-        self.image = Image(source='./Cards/'+self.rank.lower()+'_'+self.suit.lower()+'.png')
 
     def __repr__(self):
         return self.rank + self.suit
@@ -39,6 +37,8 @@ class Hand:
     def __init__(self, cards=None, bet=0, **kwargs):
         if 'shoe' in kwargs.keys():
             self.shoe=kwargs['shoe']
+        else:
+            self.shoe = shoe
         if cards is None:
             self.cards = []
         else:
@@ -89,7 +89,10 @@ class Hand:
 
     def deal(self):
         #shoe needs to be an instance of Shoe  
-        shoe=self.shoe
+        try:
+            shoe=self.shoe
+        except:
+            pass
         self.cards.append(shoe.contents.pop())
         
     def delete(self):
@@ -115,7 +118,9 @@ class Dealer:
     def __init__(self, **kwargs):
         if 'shoe' in kwargs.keys():
             self.shoe = kwargs['shoe']
-        self.hand = Hand(shoe=self.shoe)
+            self.hand = Hand(shoe=self.shoe)
+        else:
+            self.hand = Hand()
         
     def play(self):
         if player_hand.is_blackjack():
@@ -160,7 +165,7 @@ class Player:
                 print('\nYOUR SPLIT HANDS:', player.hands)
                 self.play(hand)
             
-    def play(self, hand, dealer):
+    def play(self, hand, **kwargs):
         self.bet = min(self.bet, self.cash)
         if hand.played:
             return
