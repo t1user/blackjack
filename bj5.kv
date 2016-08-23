@@ -5,19 +5,18 @@
     player_screen: player_screen
     dealer_screen: dealer_screen
     buttonstrip: buttonstrip
-    orientation: 'vertical'
     
+    orientation: 'vertical'
     spacing: 5
     padding: [5, 5, 5, 5]
 
     BoxLayout:
         id: outer
         size_hint_y: .9
-        #pos_hint: {'top': 1}
         BoxLayout:
             id: infostrip
-            size_hint_x: .1
             orientation: 'vertical'
+            size_hint_x: .1
             padding: [1, 5, 1, 5]
             spacing: 5
             Button:
@@ -47,20 +46,19 @@
             spacing: '25dp'
             CardView:
                 id: dealer_screen
+                pos_hint: {'x': root.pos_para_dealer}
             BoxLayout:
                 id: player_screen
-                #size_hint_x: None
-                #pos_hint: {'center_x': .4}
-                spacing: '100dp'
+                size_hint_x: None
+                pos_hint: {'x': root.pos_para}
+                spacing: root.hand_spacing
     BoxLayout:
         id: buttonstrip
-        pos_hint: {'bottom': 0}
-        size_hint_y: .10
-        spacing: 5
-        padding: [10, 10, 10, 10]
-
+        size_hint_y: .1
+        padding: [5, 5, 5, 5]
 
 <PlayActionButtons>:
+    spacing: 10
     Button:
         text: 'Stay'
     Button:
@@ -75,15 +73,13 @@
 
 <CardView>:
     size_hint_x: None
-    size_hint_y: .5
-    pos_hint: {'center_x': .5}
     padding: [2, 2, 2, 2]
 
 <PointsLabel>:
     size_hint: None, None
-    #pos_hint: {'right': 1, 'top': 1}
     font_size: '25dp'
-    pos_hint: {'center_y': 0.5}
+    padding: [5, 5]
+    pos_hint: {'center_y': .5}
     
 
 

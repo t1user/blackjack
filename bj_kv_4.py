@@ -14,9 +14,6 @@ from copy import deepcopy
 class CardView(RelativeLayout):
     pass
 
-class CardImage(Image):
-    pass
-
 class PointsLabel(Label):
     pass
 
@@ -37,7 +34,7 @@ class Screen(BoxLayout):
         screen.clear_widgets()
         x = 0
         for i in hand.cards:
-            screen.add_widget(CardImage(source=
+            screen.add_widget(Image(source=
             './Cards/'+i.rank.lower()+'_'+ i.suit.lower()+'.png',
              pos=(x,0)))
             x += 35
