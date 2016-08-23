@@ -241,12 +241,14 @@ class Player:
         hand.set_doubled()
         hand.bet *= 2
 
-    def split(self, hand):
+    def split(self, hand, **kwargs):
+        if 'shoe' in kwargs.keys():
+            shoe = kwargs['shoe']
         index = self.hands.index(hand)
         self.hands.remove(hand)
         i = 0
         for card in hand.cards:
-            split_hand = Hand(card, self.bet)
+            split_hand = Hand(card, self.bet, shoe=shoe)
             split_hand.set_split()
             self.hands.insert(index + i, split_hand)
             i += 1
@@ -304,6 +306,7 @@ def insurance_payout():
         return 1
     return 0
 
+"""
 def define_shoe():
     global shoe
     shoe=Shoe()
@@ -315,7 +318,7 @@ def define_dealer():
 def define_player():
     global player
     player=Player()
-    
+"""    
 
 
 if __name__ == '__main__':

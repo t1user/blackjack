@@ -6,7 +6,10 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.label import Label
 from kivy.properties import ListProperty, ObjectProperty
+
 from blackjack import *
+
+from copy import deepcopy
 
 class CardView(RelativeLayout):
     pass
@@ -19,7 +22,7 @@ class PointsLabel(Label):
 
 class Screen(BoxLayout):
     
-    playercards = ListProperty()
+    playerhands = ListProperty()
     dealercards = ListProperty()
     player_screen = ObjectProperty()
     dealer_screen = ObjectProperty()
@@ -27,7 +30,7 @@ class Screen(BoxLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         
-        self.playercards = player_hand.cards
+        self.playerhands = player.hands
         self.dealercards = dealer.hand.cards
         
     def k_play(self, screen, hand):
@@ -42,28 +45,51 @@ class Screen(BoxLayout):
             screen.add_widget(PointsLabel(text=str(hand.get_value()), 
             pos = (x + 40, 0)
             ))
+        return screen
+    
+    def on_playerhands(self, *args):
+        self.player_screen.clear_widgets()
+        for hand in self.playerhands:
+            cardview = CardView()
+            screen = self.update_player_hand(cardview, hand)
+            self.player_screen.add_widget(screen)
         
-    def on_playercards(self, *args):
-        self.k_play(self.player_screen, player_hand)
-        self.player_screen.add_widget(Label(
-        text='This is a test',
+    def update_player_hand(self, screen, hand):
+        self.k_play(screen, hand)
+        screen.add_widget(Label(
+        text='',
         font_size='25dp',
-        pos_hint={'center_x': 0.6, 'center_y': .9}
+        pos_hint={'center_x': .6, 'center_y': 1}
         ))
+        return screen
         
     def on_dealercards(self, *args):
         self.k_play(self.dealer_screen, dealer.hand)
         
     def hit(self):
-        player_hand.deal()
-        self.playercards = player_hand.cards
+        a = player.hands.pop()
+        a.deal()
+        player.hands.append(a)        
+        self.playerhands = deepcopy(player.hands)
+        print (self.playerhands)
     
     def double(self):
         dealer.hand.deal()
         self.dealercards = dealer.hand.cards
+    
+    def split(self):
+        index = player.hands.index(player_hand)
+        player.hands.remove(player_hand)
+        i = 0
+        for card in player_hand.cards:
+            split_hand = Hand(card, 5, shoe=shoe)
+            #split_hand.set_split()
+            player.hands.insert(index + i, split_hand)
+            i += 1
+        self.playerhands = deepcopy(player.hands)
         
              
-class Bj3App(App):
+class Bj4App(App):
     def build(self):
         return Screen()
         
@@ -76,6 +102,6 @@ if __name__ == '__main__':
     player_hand.deal()
     player.hands.append(player_hand)
     
-    Bj3App().run()
+    Bj4App().run()
 
 
