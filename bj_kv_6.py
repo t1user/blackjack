@@ -29,6 +29,7 @@ class InsuranceButtons(BoxLayout):
 
 class PostEvaluationButtons(BoxLayout):
     def deal(self):
+        s.bet_size.disabled = False
         c.player.bet = s.bet_size.value
         c.run()
         s.game_controller()
@@ -92,20 +93,24 @@ class Screen(BoxLayout):
     
     def game_controller(self):
         self.buttonstrip.clear_widgets()
-        self.playerhands = deepcopy(c.player.hands)
-        self.dealercards = c.dealer.hand.cards
+        self.update_screen()
         self.bet_size.disabled = True
         if c.insurance_option:
             self.buttonstrip.add_widget(InsuranceButtons())
         else:
             c.player_input(c.player_hand)
+            self.update_screen()
             if c.player_hand.played:
-                self.dealercards = c.dealer.hand.cards
-                self.cash_label.text = '{:,.0f}'.format(c.player.cash)
                 self.bet_size.disabled = False
+                self.update_screen()
                 self.buttonstrip.add_widget(PostEvaluationButtons())
             else:
                 self.buttonstrip.add_widget(PlayActionButtons())
+    
+    def update_screen(self):
+        self.playerhands = deepcopy(c.player.hands)
+        self.dealercards = c.dealer.hand.cards
+        self.cash_label.text = '{:,.0f}'.format(c.player.cash)
         
     def k_play(self, screen, hand):
         screen.clear_widgets()
@@ -119,14 +124,14 @@ class Screen(BoxLayout):
             y += self.y_card_offset
         if len(hand.cards) > 1:
             screen.add_widget(PointsLabel(text=str(hand.get_value()), 
-            pos = (x + 40, 0)
+            pos = (x + 48, 0)
             ))
         return screen
     
     def on_playerhands(self, *args):
         self.player_screen.clear_widgets()
-        self.hand_spacing = max(150 - max(len(self.playerhands)-2, 0)
-         * 75, 20)
+        self.hand_spacing = max(150 - max(len(self.playerhands)-3, 0)
+         * 65, 15)
         self.pos_para = max(.4 - len(self.playerhands)/10, 0)
         if len(self.playerhands) > 2:
             self.x_card_offset = 18

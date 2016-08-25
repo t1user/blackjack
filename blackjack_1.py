@@ -47,6 +47,7 @@ class Hand:
         self.split = False
         self.bet = bet
         self.result_message = ''
+        self.result = 0
         if len(self.cards) == 0:
             self.deal()
        
@@ -92,14 +93,10 @@ class Hand:
         return str(self.cards)
 
 class Dealer:
-    def __init__(self, **kwargs):
-        if 'shoe' in kwargs.keys():
-            self.shoe = kwargs['shoe']
-            self.hand = Hand(shoe=self.shoe)
-        else:
-            self.hand = Hand()
+    def __init__(self):
+        self.hand = Hand()
         
-    def play(self, player_hand, **kwargs):
+    def play(self, player_hand, player):
         if player_hand.is_blackjack():
             for card in itertools.chain(FACES, 'A'):
                 if card in self.hand.get_ranks():
@@ -108,10 +105,32 @@ class Dealer:
                         return 'BJ'
                     return
             return
-        if player_hand.is_bust:
-            if player.insurance:
-                self.hand.deal()
+        
+        # if at least one hand is not bust dealer should take a card
+        # dealer should also take a card if insurance is in play
+        for hand in player.hands:
+            if hand.is_bust:
+                if player.insurance:
+                    #take just one card to check for bj
+                    self.hand.deal()
+                    # return gives control back to the controller
+                    # so no extra cards are taken (just one)
+                    # case: hand bust, insurance in play
+                    return
+                # continue to look for a non-bust hand
+                continue
+            # break stops 'for' loop because a non-bust hand has been found
+            # moving on to deal cards to the dealer
+            break
+        # we reached this point either because all cards are bust
+        # or because we found a non-bust card and got broken out of 'for'
+        # if it's the first case return control to the controller
+        # dealer hand not played
+        # otherwise move on to play dealer hand
+        if hand.is_bust:
             return
+        
+        # we should be at this point if dealer hand needs to be played    
         while not self.hand.is_bust:
             if self.hand.get_value() < 17:
                 self.hand.deal()
@@ -124,7 +143,6 @@ class Player:
     def __init__(self, cash=5000, hands=None, bet=50):
         self.cash = cash
         self.bet = bet
-        self.result = 0
         self.insurance = False
         if hands is None:
             self.hands = []
@@ -143,7 +161,8 @@ class Controller:
     def run(self):
         if len(self.shoe.contents) <= self.shoe.cut_card:
             print('\n!!!SHUFFLE!!!\n')
-            self.shoe = Shoe()
+            global shoe
+            shoe = Shoe()
 
 #        if player.cash < player.bet:
 #            print()
@@ -182,7 +201,6 @@ class Controller:
             hand.played = True
         elif hand.is_bust:
             hand.played = True
-            return
         elif not hand.played:
             self.options = [1, 0, 0, 1]
             if len(hand.cards) == 2:
@@ -194,15 +212,18 @@ class Controller:
                     self.options = [1, 1, 1, 1]
 
         for hand in self.player.hands:
+            print('evaluating: ', hand)
             if not hand.played:
                 self.player_hand = hand
                 if len(self.player_hand.cards) < 2:
                     self.player_hand.deal()
+                    print('card delt: ', hand)
                 return
-            else:
-                print('running dealer')
-                self.dealer.play(self.player_hand, player=self.player)
-                self.final()
+            
+        print('running dealer')
+        self.dealer.play(self.player_hand, player=self.player)
+        print('Dealer hand: ', self.dealer.hand)
+        self.final()
     
     def buy_insurance(self):
         self.player.insurance = True
@@ -238,6 +259,9 @@ class Controller:
             split_hand.split = True
             self.player.hands.insert(index + i, split_hand)
             i += 1
+        # bet is charged while playing every new hand 
+        # so add-back original bet to keep total bet at 2x
+        self.player.cash += self.player.bet 
         self.play_all_hands()  
              
     def hit(self, hand):
@@ -257,9 +281,9 @@ class Controller:
         print('entering final')
         for hand in self.player.hands:
             hand.result_message = self.evaluate(hand, self.dealer.hand)
-            self.player.cash += self.result * hand.bet
+            self.player.cash += hand.result * hand.bet
         if self.player.insurance:
-            self.player.cash = self.insurance_payout() * self.player.bet
+            self.player.cash += self.insurance_payout()*1.5*self.player.bet
             self.player.insurance = False
         print('round finished')
 
@@ -267,27 +291,27 @@ class Controller:
     def evaluate(self, pl_hand, dl_hand):
         if pl_hand.get_value() == 'BJ':
             if dl_hand.get_value() == 'BJ':
-                self.result = 1
-                return '---PUSH---'
-            self.result = 2.5
-            return '---YOU HAVE BLACKJACK---'
+                pl_hand.result = 1
+                return 'PUSH'
+            pl_hand.result = 2.5
+            return 'YOU HAVE BLACKJACK'
         elif dl_hand.get_value() == 'BJ':
-            self.result = 0
-            return '---DEALER HAS BLACKJACK---'
+            pl_hand.result = 0
+            return 'DEALER HAS BLACKJACK'
         if pl_hand.is_bust:
-            self.player.result = 0
-            return "---YOU'RE BUST---"
+            pl_hand.result = 0
+            return "YOU'RE BUST"
         elif dl_hand.is_bust:
-            self.result = 2
-            return '---DEALER BUST---'
+            pl_hand.result = 2
+            return 'DEALER BUST'
         elif pl_hand.get_value() > dl_hand.get_value():
-            self.result = 2
-            return '---YOU WIN---'
+            pl_hand.result = 2
+            return 'YOU WIN'
         elif pl_hand.get_value() == dl_hand.get_value():
-            self.result = 1
-            return '---PUSH---'
-        self.result = 0
-        return '---YOU LOSE---'
+            pl_hand.result = 1
+            return 'PUSH'
+        pl_hand.result = 0
+        return 'YOU LOSE'
 
     def insurance_payout(self):
         self.insurance_asked = False
