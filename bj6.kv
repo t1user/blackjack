@@ -70,22 +70,51 @@
         padding: [5, 5, 5, 5]
 
 <PlayActionButtons>:
-    stay_button: stay_button
-    spacing: 10
+    spacing: '10dp'
     Button:
-        id: stay_button
-        text: 'Stay'
-        on_press: root.stay()
+        id: stand_button
+        text: 'Stand'
+        disabled: not root.active_options[0]
+        on_press: root.stand()
     Button:
         text: 'Split'
+        disabled: not root.active_options[1]
         on_press: root.split()
     Button:
         text: 'Double'
+        disabled: not root.active_options[2]
         on_press: root.double()
-        disabled: True
     Button:
         text: 'Hit'
+        disabled: not root.active_options[3]
         on_press: root.hit()
+
+<PostEvaluationButtons>:
+    spacing: '40dp'
+    padding: [20, 1, 20, 1]
+    Button:
+        size_hint_x: .3
+        text: 'Start Over'
+        on_press: root.start_over()
+    Button:
+        size_hint_x: .7
+        text: 'Deal'
+        on_press: root.deal()
+
+<InsuranceButtons>:
+    spacing: '40dp'
+    padding: [20, 1, 20, 1]
+    Label:
+        text: 'Buy Insurance?'
+        size_hint_x: .5
+    Button:
+        size_hint_x: .25
+        text: 'Yes'
+        on_press: root.yes()
+    Button:
+        size_hint_x: .25
+        text: 'No'
+        on_press: root.no()
 
 <CardView>:
     size_hint_x: None
