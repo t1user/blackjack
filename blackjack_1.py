@@ -17,6 +17,10 @@ class Card:
 
 class Shoe:
     def __init__(self):
+        self.shuffle()
+        
+    def shuffle(self):        
+        self.will_shuffle = ''
         deck = []
         for suit in SUITS:
             for rank in RANKS:
@@ -26,9 +30,7 @@ class Shoe:
         for i in range(6):
             for n in deck:
              self.contents.append(n)      
-        self.shuffle()
-        
-    def shuffle(self):
+
         random.shuffle(self.contents)
         self.cut_card = round(random.randint(20,25)*len(self.contents)/100,0)
 
@@ -88,9 +90,12 @@ class Hand:
 
     def deal(self):
         self.cards.append(self.shoe.contents.pop())
+        if len(self.shoe.contents) < self.shoe.cut_card:
+            self.shoe.will_shuffle = 'SHUFFLE'
 
     def __repr__(self):
         return str(self.cards)
+
 
 class Dealer:
     def __init__(self):
@@ -120,7 +125,6 @@ class Dealer:
                 # continue to look for a non-bust hand
                 continue
             # break stops 'for' loop because a non-bust hand has been found
-            # moving on to deal cards to the dealer
             break
         # we reached this point either because all cards are bust
         # or because we found a non-bust card and got broken out of 'for'
@@ -139,8 +143,9 @@ class Dealer:
             else:
                 break
 
+
 class Player:
-    def __init__(self, cash=5000, hands=None, bet=50):
+    def __init__(self, cash=500, hands=None, bet=50):
         self.cash = cash
         self.bet = bet
         self.insurance = False
@@ -148,6 +153,7 @@ class Player:
             self.hands = []
         else:
             self.hands = hands
+
 
 class Controller:  
     def __init__(self):
@@ -157,19 +163,15 @@ class Controller:
         self.player = Player()
         self.insurance_option = False
         self.insurance_asked = False
+        self.no_cash = False
     
     def run(self):
-        if len(self.shoe.contents) <= self.shoe.cut_card:
-            print('\n!!!SHUFFLE!!!\n')
-            global shoe
-            shoe = Shoe()
-
-#        if player.cash < player.bet:
-#            print()
-#            print("YOU LOST ALL YOUR MONEY. YOU MAKE ME SICK YOU STUPID FUCK!!!")
-#            break
+        if len(shoe.contents) <= shoe.cut_card:
+            shoe.shuffle()
+        if self.player.cash < self.player.bet:
+            self.no_cash = True
+            return
         self.player.hands = []
-        print('hands cleared')
         self.player_hand = Hand(bet=self.player.bet)
         self.dealer = Dealer()
         self.player_hand.deal()
@@ -178,7 +180,6 @@ class Controller:
         self.insurance_asked = False
 
     def play(self, hand):
-        print('play', hand)
         self.bet = min(self.player.bet, self.player.cash)
         if hand.played:
             return
@@ -189,12 +190,6 @@ class Controller:
         if hand.is_blackjack():
             hand.played = True
             return 'BJ'
-        """
-        else:
-            if hand.doubled :
-                return
-            self.player_input(hand)
-        """
         
     def player_input(self, hand):
         if hand.get_value() == 21:
@@ -212,17 +207,15 @@ class Controller:
                     self.options = [1, 1, 1, 1]
 
         for hand in self.player.hands:
-            print('evaluating: ', hand)
             if not hand.played:
                 self.player_hand = hand
                 if len(self.player_hand.cards) < 2:
                     self.player_hand.deal()
-                    print('card delt: ', hand)
+                    # need to check if 21 before waiting for user input
+                    self.player_input(self.player_hand)
                 return
             
-        print('running dealer')
         self.dealer.play(self.player_hand, player=self.player)
-        print('Dealer hand: ', self.dealer.hand)
         self.final()
     
     def buy_insurance(self):
@@ -239,18 +232,11 @@ class Controller:
     def play_all_hands(self):
         for hand in self.player.hands:
             self.play(hand)
-            
-            """
-            self.player_hand = hand
-            if self.player_hand.played:
-                continue
-            else:
-                print('playing hand: ', self.player_hand)
-                self.player_hand.deal()
-                self.play(self.player_hand)
-            """
 
     def split(self, hand):
+        if self.player.cash < self.player.bet:
+            self.no_cash = True
+            return        
         index = self.player.hands.index(hand)
         self.player.hands.remove(hand)
         i = 0
@@ -271,6 +257,9 @@ class Controller:
         hand.played = True
 
     def double(self, hand):
+        if self.player.cash < self.player.bet:
+            self.no_cash = True
+            return
         self.player.cash -= self.player.bet
         hand.deal()
         hand.doubled = True
@@ -278,15 +267,12 @@ class Controller:
         hand.bet *= 2
  
     def final(self):
-        print('entering final')
         for hand in self.player.hands:
             hand.result_message = self.evaluate(hand, self.dealer.hand)
             self.player.cash += hand.result * hand.bet
         if self.player.insurance:
             self.player.cash += self.insurance_payout()*1.5*self.player.bet
             self.player.insurance = False
-        print('round finished')
-
         
     def evaluate(self, pl_hand, dl_hand):
         if pl_hand.get_value() == 'BJ':
@@ -318,67 +304,6 @@ class Controller:
         if self.dealer.hand.is_blackjack():
             return 1
         return 0 
-
-
-
-"""
-                if play == 'H':
-                    self.hit(hand)
-                if play == 'S':
-                    self.stand(hand)
-                    hand.set_played()
-                    return
-                if 's(P)lit' in options:
-                    if play == 'P':
-                        if self.cash < self.bet:
-                            print("YOU DON'T HAVE ENOUGH CASH TO SPLIT!!!".center(80))
-                            continue
-                        self.split(hand)
-                        return
-                if '(D)ouble' in options:
-                    if play == 'D':
-                        if self.cash < self.bet:
-                            print("YOU DON'T HAVE ENOUGH CASH TO DOUBLE!!!".center(80))
-                            continue
-                        self.double(hand)
-                        hand.set_played()
-                        return
-            return
-"""
-        
-"""        
-        print()
-        print('RESULT:'.center(80))
-        show_dealer_hand(dealer.hand)
-        counter = 0
-        for hand in player.hands:
-            if counter > 0:
-                show_player_hand(hand, True)
-            else:
-                show_player_hand(hand)
-            result = evaluate(hand, dealer.hand)
-            cash_result = player.result * hand.bet
-            print('{} hand cash result: {:+}'.format(result, \
-                    cash_result - hand.bet).center(80))
-            player.cash += cash_result
-            counter += 1
-        if player.insurance:
-            cash_result = insurance_payout() * player.bet
-            print('---Insurance: cash result: {:+}'.format(cash_result - player.bet/2)
-                  .center(80))
-            player.cash += cash_result
-            player.insurance = False
-        player.hands = []
-"""
-
-if __name__ == '__main__':
-    pass
-
-        
-
-
-
-
 
         
               
