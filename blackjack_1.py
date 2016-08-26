@@ -56,7 +56,7 @@ class Hand:
     def get_value(self):
         value = 0
         soft_value = 0
-        if self.is_blackjack() and not self.split:
+        if self.is_blackjack() and not self.split and not self.doubled:
             return 'BJ'
         for card in self.cards:
             if card.rank in FACES:
@@ -80,6 +80,8 @@ class Hand:
         return ranks
     
     def is_blackjack(self):
+        if self.doubled or self.split:
+            return False
         if len(self.cards) != 2:
             return False
         if 'A' in self.get_ranks():
@@ -133,7 +135,6 @@ class Dealer:
         # otherwise move on to play dealer hand
         if hand.is_bust:
             return
-        
         # we should be at this point if dealer hand needs to be played    
         while not self.hand.is_bust:
             if self.hand.get_value() < 17:
@@ -145,7 +146,7 @@ class Dealer:
 
 
 class Player:
-    def __init__(self, cash=500, hands=None, bet=50):
+    def __init__(self, cash=5000, hands=None, bet=50):
         self.cash = cash
         self.bet = bet
         self.insurance = False
@@ -214,8 +215,7 @@ class Controller:
                     self.player_hand.deal()
                     # need to check if 21 before waiting for user input
                     self.player_input(self.player_hand)
-                return
-            
+                return   
         self.dealer.play(self.player_hand, player=self.player)
         self.final()
     
@@ -311,7 +311,7 @@ class Controller:
     def start_over(self):
         self.player = Player()
         shoe.shuffle()
-        self.run()
+        self.game_over = False
         
               
 

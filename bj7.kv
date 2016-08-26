@@ -43,14 +43,14 @@
                 halign: 'center'
                 size_hint_y: .05
             Label:
-                text: str(bet_size.value)
+                text: '{:,.0f}'.format(bet_size.value)
                 font_size: '30dp'
                 size_hint_y: .05
             Slider:
                 id: bet_size
                 size_hint_y: .6
                 orientation: 'vertical'
-                max: 300
+                max: 500
                 step: 25
                 value: 50
         BoxLayout:
@@ -128,6 +128,18 @@
     padding: [5, 5]
     pos_hint: {'center_y': .5}
     
+<WelcomeScreen>:
+    title: 'Welcome!'
+    title_align: 'center'
+    size_hint: .75, .75
+    Label:
+        text: '[size=30]Welcome to\n\n[/size][size=75]BlackJack\n[/size]Set bet size with the slider on the left\nPush \'Deal\' to begin.'
+        markup: True
+        halign: 'center'
+
+
+    
+
 
 
 

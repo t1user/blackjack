@@ -14,6 +14,9 @@ from blackjack_1 import Controller
 
 from copy import deepcopy
 
+class WelcomeScreen(Popup):
+    pass
+
 class CardView(RelativeLayout):
     pass
 
@@ -31,6 +34,8 @@ class InsuranceButtons(BoxLayout):
 
 class PostEvaluationButtons(BoxLayout):
     def deal(self):
+        if s.welcome:
+            s.welcome.dismiss()
         s.bet_size.disabled = False
         c.player.bet = s.bet_size.value
         c.run()
@@ -83,28 +88,37 @@ class Screen(BoxLayout):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        
-        self.playerhands = c.player.hands
-        self.dealercards = c.dealer.hand.cards
-        
-        #self.result_message = hand.result_message
-        
+                
         self.x_card_offset = 35
         self.y_card_offset = 6
         
-        self.game_controller()
+        self.no_cash_text = {
+        'button_text': 'Close', 
+        'label_text': "You don't have enough cash for this bet",
+        'title': 'No Cash'
+        }
+        
+        self.start_over_text = {
+        'button_text': 'Play Again', 
+        'label_text': "You lost all your money!!!\n\nYou make me sick you STUPID FUCK.",
+        'title': 'Stupid Fuck'
+        }
+        
+        self.popup = None
+                
+        self.start_screen()
     
     def game_controller(self):
         self.bet_size.min = min(25, c.player.cash)
         self.buttonstrip.clear_widgets()
         self.update_screen()
         self.bet_size.disabled = True
-        if c.no_cash:
-            self.no_cash_popup()
+        if c.no_cash and not c.game_over:
+            self.no_cash_popup(self.no_cash_text)
             c.no_cash = False
         if c.game_over:
-            self.start_over_popup()
-            self.play_again()
+            self.no_cash_popup(self.start_over_text)
+            return
         if c.insurance_option:
             self.buttonstrip.add_widget(InsuranceButtons())
         else:
@@ -133,19 +147,21 @@ class Screen(BoxLayout):
         for i in hand.cards:
             screen.add_widget(Image(source=
             './Cards/'+i.rank.lower()+'_'+ i.suit.lower()+'.png',
-             pos=(x,y)))
+             pos=(x,y), size_hint_x=1.1))
             x += self.x_card_offset
             y += self.y_card_offset
         if len(hand.cards) > 1:
             screen.add_widget(PointsLabel(text=str(hand.get_value()), 
-            pos = (x + 48, 0)
+            pos=(x + 52, 0)
             ))
         return screen
     
     def on_playerhands(self, *args):
         self.player_screen.clear_widgets()
+        # determines space between multiple hands
         self.hand_spacing = max(150 - max(len(self.playerhands)-3, 0)
          * 65, 15)
+        # determines left margin
         self.pos_para = max(.4 - len(self.playerhands)/10, 0)
         if len(self.playerhands) > 2:
             self.x_card_offset = 18
@@ -175,32 +191,37 @@ class Screen(BoxLayout):
             self.pos_para_dealer = 0.2
         self.k_play(self.dealer_screen, c.dealer.hand)
      
-    def no_cash_popup(self):
-        btnclose = Button(text='Close', size_hint_y=None, height='40sp')
+    def no_cash_popup(self, t):
+        def action_post_dismiss(instance):
+            if c.game_over:
+                self.play_again()
+            else:
+                pass
+        btnclose = Button(text=t['button_text'], size_hint_y=None, height='40sp')
         content = BoxLayout(orientation='vertical')
-        content.add_widget(Label(text="You don't have enough cash for this bet"))
+        content.add_widget(Label(text=t['label_text'], halign='center', font_size='20sp'))
         content.add_widget(btnclose)
-        popup = Popup(title = 'No Cash', 
+        self.popup = Popup(title = t['title'], 
                 content = content, size_hint = (.5, .5),
-                auto_dismiss=False)
-        btnclose.bind(on_release=popup.dismiss)
-        popup.open()
-        
-    def start_over_popup(self):
-        btnclose = Button(text='Play Again', size_hint_y=None, height='40sp')
-        content = BoxLayout(orientation='vertical')
-        content.add_widget(Label(text="You lost all your money!!!\n\nYou make me sick you STUPID FUCK.",
-        halign='center'))
-        content.add_widget(btnclose)
-        popup = Popup(title = 'Stupid Fuck', 
-                content = content, size_hint = (.5, .5),
-                auto_dismiss=False)
-        btnclose.bind(on_release=popup.dismiss)
-        popup.open()
-    
+                auto_dismiss=False, title_align='center')
+        btnclose.bind(on_release=self.popup.dismiss)
+        self.popup.bind(on_dismiss=action_post_dismiss)
+        self.popup.open()
+           
     def play_again(self):
         c.start_over()
-        #self.game_controller()
+        self.start_screen()
+    
+    def start_screen(self):
+        self.dealer_screen.clear_widgets()
+        self.player_screen.clear_widgets()
+        self.buttonstrip.clear_widgets()
+        self.bet_size.disabled = False
+        c.no_cash = False
+        self.buttonstrip.add_widget(PostEvaluationButtons())
+        self.cash_label.text = '{:,.0f}'.format(c.player.cash)
+        self.welcome = WelcomeScreen()
+        self.welcome.open()
         
         
 class Bj7App(App):
@@ -212,8 +233,6 @@ class Bj7App(App):
         
 if __name__ == '__main__':
     c = Controller()
-    c.run()
-    
     Bj7App().run()
 
 
