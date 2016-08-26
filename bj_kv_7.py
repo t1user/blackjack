@@ -102,7 +102,7 @@ class Screen(BoxLayout):
         if c.no_cash:
             self.no_cash_popup()
             c.no_cash = False
-        if c.player.cash == 0:
+        if c.game_over:
             self.start_over_popup()
             self.play_again()
         if c.insurance_option:
@@ -199,8 +199,8 @@ class Screen(BoxLayout):
         popup.open()
     
     def play_again(self):
-        c = Controller()
-        c.run
+        c.start_over()
+        #self.game_controller()
         
         
 class Bj7App(App):

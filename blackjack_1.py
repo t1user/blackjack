@@ -164,6 +164,7 @@ class Controller:
         self.insurance_option = False
         self.insurance_asked = False
         self.no_cash = False
+        self.game_over = False
     
     def run(self):
         if len(shoe.contents) <= shoe.cut_card:
@@ -273,6 +274,8 @@ class Controller:
         if self.player.insurance:
             self.player.cash += self.insurance_payout()*1.5*self.player.bet
             self.player.insurance = False
+        if self.player.cash == 0:
+            self.game_over = True
         
     def evaluate(self, pl_hand, dl_hand):
         if pl_hand.get_value() == 'BJ':
@@ -305,6 +308,10 @@ class Controller:
             return 1
         return 0 
 
+    def start_over(self):
+        self.player = Player()
+        shoe.shuffle()
+        self.run()
         
               
 
