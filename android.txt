@@ -1,0 +1,3 @@
+title=BlackJack
+author=TM
+orientation=landscape
