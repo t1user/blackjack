@@ -158,7 +158,7 @@ class Screen(BoxLayout):
         self.player_screen.clear_widgets()
         # determines space between multiple hands
         self.hand_spacing = max(400 - max(len(self.playerhands)-3, 0)
-         * 160, 15)
+         * 50, 50)
         # determines left margin
         self.pos_para = max(.4 - len(self.playerhands)*1.0/10.0, 0)
         if len(self.playerhands) > 2:
