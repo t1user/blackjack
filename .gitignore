@@ -3,4 +3,4 @@ __pychache__
 #*
 .buildozer/
 *.egg-info
-.vscode
+.vscode/
