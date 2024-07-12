@@ -1,0 +1,50 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=64", "setuptools-scm>=8"]
+
+[project]
+authors = [
+  {name = "t1user", email = "enterdragon@duck.com"},
+]
+dependencies = [
+  "kivy",
+]
+description = 'Blackjack simulator with kivi interface.'
+dynamic = ["version"]
+keywords = ["blackjack", "kivy"]
+name = "blackjack"
+readme = "README.md"
+requires-python = ">= 3.12"
+
+[project.optional-dependencies]
+all = ["blackjack[dev]"]
+dev = [
+  "isort",
+  "mypy",
+  "autopep8",
+  "yapf",
+  "black",
+  "flake8",
+  "pytest",
+]
+
+[tool.setuptools]
+packages = ["blackjack"]
+
+[project.urls]
+Repository = "https://github.com/t1user/bj"
+
+# [project.scripts]
+
+[tool.setuptools_scm]
+version_file = "blackjack/_version.py"
+
+[tool.isort]
+profile = "black"
+
+#[tool.mypy]
+#mypy_path = "$MYPY_CONFIG_FILE_DIR/stubs"
+# check_untyped_defs = true
+
+[tool.pytest.ini_options]
+addopts = ["-p", "no:warnings"]
