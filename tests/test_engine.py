@@ -91,6 +91,7 @@ def test_blackjack_is_blackjack():
 
 
 def test_hand_with_ace_hard_value():
+    # It's (10, 20) so if no more cards taken the value that matters is 20
     assert Hand(Card("A", "D"), Card("9", "H")).value == 20
 
 
@@ -99,10 +100,12 @@ def test_hand_with_ace_soft_value():
 
 
 def test_not_bust_with_ace():
+    # hard value is bust but soft not
     assert not Hand(Card("A", "D"), Card("9", "H"), Card("8", "C")).is_bust()
 
 
 def test_bust_with_ace():
+    # both soft and hard values are bust
     assert Hand(
         Card("A", "D"), Card("9", "H"), Card("8", "C"), Card("10", "D")
     ).is_bust()
@@ -141,6 +144,7 @@ def test_blackjack_trumps_21():
 
 
 def test_blackjack_21_less_than_blackjack():
+    # testing if comparison operators work on both sides
     hand_bj = Hand(Card("A", "S"), Card("K", "D"))
     hand_21 = Hand(Card("10", "D"), Card("5", "H"), Card("6", "D"))
     assert hand_21 < hand_bj
