@@ -1,6 +1,6 @@
 import pytest
 
-from blackjack.engine import DECK, Card, Hand, Shoe
+from blackjack.engine import DECK, Card, Cash, Hand, Shoe
 
 
 def test_Card_cannot_be_instantiated_with_wrong_suit():
@@ -90,6 +90,10 @@ def test_blackjack_is_blackjack():
     assert Hand(Card("A", "H"), Card("K", "D")).is_blackjack()
 
 
+def test_blackjack_cannot_split():
+    assert not Hand(Card("A", "H"), Card("K", "D")).can_split()
+
+
 def test_hand_with_ace_hard_value():
     # It's (10, 20) so if no more cards taken the value that matters is 20
     assert Hand(Card("A", "D"), Card("9", "H")).value == 20
@@ -143,7 +147,7 @@ def test_blackjack_trumps_21():
     assert hand_bj > hand_21
 
 
-def test_blackjack_21_less_than_blackjack():
+def test_21_less_than_blackjack():
     # testing if comparison operators work on both sides
     hand_bj = Hand(Card("A", "S"), Card("K", "D"))
     hand_21 = Hand(Card("10", "D"), Card("5", "H"), Card("6", "D"))
@@ -154,3 +158,25 @@ def test_two_blackjacks_equal():
     hand_1 = Hand(Card("A", "S"), Card("K", "D"))
     hand_2 = Hand(Card("A", "D"), Card("J", "S"))
     assert hand_1 == hand_2
+
+
+def test_cash_instantiates():
+    cash = Cash(10)
+    assert isinstance(cash, Cash)
+
+
+def test_cash_eq():
+    cash = Cash(10)
+    assert cash == 10
+
+
+def test_cash_credits():
+    cash = Cash(10)
+    cash += 5
+    assert cash == 15
+
+
+def test_cash_debits():
+    cash = Cash(10)
+    cash -= 5
+    assert cash == 5
