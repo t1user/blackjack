@@ -1,6 +1,7 @@
 import pytest
 
-from blackjack.engine import DECK, Card, Cash, Hand, Shoe
+from blackjack.engine import DECK, Card, Hand, NotEnoughCash, Player, Shoe
+from blackjack.strategies import FixedBettingStrategy, RandomStrategy
 
 
 def test_Card_cannot_be_instantiated_with_wrong_suit():
@@ -160,23 +161,28 @@ def test_two_blackjacks_equal():
     assert hand_1 == hand_2
 
 
-def test_cash_instantiates():
-    cash = Cash(10)
-    assert isinstance(cash, Cash)
+class TestPlayer:
 
+    @pytest.fixture
+    def player():
+        return Player(RandomStrategy(), FixedBettingStrategy(10), 100)
 
-def test_cash_eq():
-    cash = Cash(10)
-    assert cash == 10
+    def test_cash_credits(self, player: Player):
+        player.credit(10)
+        assert player.cash == 110
 
+    def test_cash_charges(self, player: Player):
+        print(id(player), player)
+        player.charge(10)
+        assert player.cash == 90
 
-def test_cash_credits():
-    cash = Cash(10)
-    cash += 5
-    assert cash == 15
+    def test_overdrawn_raises(self, player: Player):
+        with pytest.raises(NotEnoughCash):
+            player.charge(110)
 
-
-def test_cash_debits():
-    cash = Cash(10)
-    cash -= 5
-    assert cash == 5
+    def test_overdrawn_doesnt_change_balance(self, player: Player):
+        try:
+            player.charge(110)
+        except NotEnoughCash:
+            pass
+        assert player.cash == 100

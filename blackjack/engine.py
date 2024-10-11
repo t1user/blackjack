@@ -14,6 +14,7 @@ RESPLIT_ACES = False
 BURN_PERCENT_RANGE = (20, 25)  # penetration percentage range (min, max)
 NUMBER_OF_DECKS = 6
 PLAYER_CASH = 1_000
+BLACKJACK_PAYOUT = 3 / 2
 # ### End-rules ###
 
 SUITS = ["S", "H", "D", "C"]
@@ -215,22 +216,43 @@ class HandPlay:
     evaluating wheather play was won or lost.
     """
 
-    betsize: int
-    player: "Player"
+    player: Player
+    betsize: float
     hand: Hand = field(default_factory=Hand)
     insurance: bool = False
     splits: int = 0
     _is_done: bool = field(init=False, default=False, repr=False)
 
-    def __post_init__(self):
-        pass
+    @classmethod
+    def from_player(cls, player: Player) -> Self:
+        return cls(player, player.betting_strategy.bet())
 
-    def charge_bet(self) -> None:
-        self.player.charge(self.betsize)
+    @staticmethod
+    def check_if_done_first(
+        func: Callable[..., bool | None]
+    ) -> Callable[..., bool | None]:
+        """
+        Decorator, which will cause the method to immediately return if it's applied
+        on a HandPlay object with .is_done property evaluating to True.
+        """
+
+        @wraps(func)
+        def wrapper(self: Table, dealer: Dealer, hand_play: HandPlay):
+            if hand_play.is_done:
+                return None
+            else:
+                return func(self, dealer, hand_play)
+
+        return wrapper
+
+    def charge_bet(self, bet_multiple: float = 1) -> None:
+        self.player.charge(self.betsize * bet_multiple)
+
+    def credit_bet(self, bet_muliple: float = 1) -> None:
+        self.player.credit(self.betsize * bet_muliple)
 
     @property
     def is_done(self) -> bool:
-
         return (
             # no resplits on double aces
             (bool(self.splits) and self.hand.is_double_aces())
@@ -245,7 +267,7 @@ class HandPlay:
     def done(self) -> None:
         self._is_done = True
 
-    def surrender(self, *args) -> Literal[-1, 0, 1]:
+    def surrender(self, *args: Any) -> Literal[-1, 0, 1]:
         pass
 
     def insure(self, dealer_hand: Hand) -> None:
@@ -273,6 +295,7 @@ class HandPlay:
         self.hand.append(card)
         return self
 
+    @property
     def can_split(self):
         if self.is_done or (self.splits > MAX_SPLITS):
             return False
@@ -284,48 +307,16 @@ class HandPlay:
         cls, bet_size: int, player: Player, hand: Hand, splits: int, **kwargs: Any
     ) -> list[Self]:
         return [
-            cls(bet_size, player, Hand(card), splits=splits + 1, **kwargs)
+            cls(player, bet_size, Hand(card), splits=splits + 1, **kwargs)
             for card in hand
         ]
-
-
-class NotEnoughCash(Exception):
-    pass
-
-
-class Cash:
-
-    def __init__(self, balance: float):
-        if balance < 0:
-            raise ValueError("Initial cash value must be greater than zero.")
-        self.balance = balance
-
-    def check_amount(self, amount: float) -> float:
-        if amount > self.balance:
-            raise NotEnoughCash("Not enough cash")
-        else:
-            return amount
-
-    def charge(self, amount: float) -> float:
-        self.balance -= self.check_amount(amount)
-        return self.balance
-
-    def credit(self, amount: float) -> float:
-        self.balance += amount
-        return self.balance
-
-    __iadd__ = credit
-    __isub__ = charge
-
-    def __eq__(self, value: object) -> bool:
-        return self.balance == value
 
 
 @dataclass
 class Dealer:
     shoe: Shoe = field(default_factory=partial(Shoe, NUMBER_OF_DECKS))
     hand: Hand = field(default_factory=Hand)
-    game_strategy: DealerStrategy = DealerStrategy()
+    strategy: DealerStrategy = DealerStrategy()
 
     def deal(self, hand: Hand):
         hand += self.shoe.pop()
@@ -338,24 +329,27 @@ class Dealer:
         pass
 
 
+class NotEnoughCash(Exception):
+    pass
+
+
 @dataclass
 class Player:
     strategy: GameStrategy
     betting_strategy: BettingStrategy
-    cash: Cash = field(default_factory=partial(Cash, PLAYER_CASH))
+    cash: float = PLAYER_CASH
+    will_continue: bool = True  # set to False to exclude player in next round
 
-    @property
-    def will_continue(self) -> bool:
-        return True
+    def charge(self, amount: float) -> float:
+        if amount > self.cash:
+            raise NotEnoughCash("Not enough cash")
+        else:
+            self.cash -= amount
+            return self.cash
 
-    def charge(self, amount: float) -> None:
-        self.cash.charge(amount)
-
-    def credit(self, amount: float) -> None:
-        self.cash.credit(amount)
-
-
-# DECIDE HOW YOU WANT CASH HANDLED, IT'S NOT DONE
+    def credit(self, amount: float) -> float:
+        self.cash += amount
+        return self.cash
 
 
 @dataclass
@@ -375,24 +369,6 @@ class Table:
             # works now but careful!
             for hand_play in self.hands:
                 func(dealer, hand_play)
-
-        return wrapper
-
-    @staticmethod
-    def check_if_done_first(
-        func: Callable[..., bool | None]
-    ) -> Callable[..., bool | None]:
-        """
-        Decorator, which will cause the method to immediately return if it's applied
-        on a HandPlay object with .is_done property evaluating to True.
-        """
-
-        @wraps(func)
-        def wrapper(self: Table, dealer: Dealer, hand_play: HandPlay):
-            if hand_play.is_done:
-                return None
-            else:
-                return func(self, dealer, hand_play)
 
         return wrapper
 
@@ -420,8 +396,6 @@ class Table:
             return True
         return False
 
-    @charge_bet
-    @check_if_done_first
     def play(self, dealer: Dealer, hand_play: HandPlay) -> None:
         # surender?
         # split
@@ -434,7 +408,6 @@ class Table:
         # hit
         self.hit(dealer, hand_play)
 
-    @check_if_done_first
     def split(self, dealer: Dealer, hand_play: HandPlay) -> bool:
         if hand_play.can_split() and hand_play.player.strategy.split(
             dealer.hand, hand_play.hand
@@ -452,7 +425,6 @@ class Table:
             return True
         return False
 
-    @check_if_done_first
     def double(self, dealer: Dealer, hand_play: HandPlay) -> bool:
         if hand_play.player.strategy.double(dealer.hand, hand_play.hand):
             hand_play.player.cash -= hand_play.betsize
@@ -462,7 +434,6 @@ class Table:
             return True
         return False
 
-    @check_if_done_first
     def hit(self, dealer: Dealer, hand_play: HandPlay) -> bool:
         while (not hand_play.is_done) and (
             hand_play.player.strategy.hit(dealer.hand, hand_play.hand)
@@ -478,12 +449,29 @@ class Table:
 @dataclass
 class Round:
     dealer: Dealer
-    table: Table
+    hands: list[HandPlay] = field(default_factory=list)
+
+    @staticmethod
+    def all_hands(func: Callable[..., bool | None]) -> Callable[..., bool | None]:
+        """
+        Decorator, which if applied to a method, will call this method on all objects in
+        self.hands.
+        """
+
+        @wraps(func)
+        def wrapper(self: Table, dealer: Dealer) -> None:
+            # self.hands may be modified during iteration!
+            # works now but careful!
+            for hand_play in self.hands:
+                func(dealer, hand_play)
+
+        return wrapper
 
     def shuffle(self) -> Self:
         self.dealer.shuffle()
         return self
 
+    @all_hands
     def place_bets(self) -> Self:
         return self
 

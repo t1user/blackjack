@@ -25,6 +25,9 @@ class GameStrategy(ABC):
     @abstractmethod
     def hit(self, dealer_hand: Hand, player_hand: Hand) -> bool: ...
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__qualname__}()"
+
 
 class RandomStrategy(GameStrategy):
     def surrender(self, dealer_hand: Hand, player_hand: Hand) -> bool:
@@ -64,6 +67,9 @@ class DealerStrategy:
     def hit(self, dealer_hand: Hand) -> bool:
         return dealer_hand.soft_value < 17
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__qualname__}()"
+
 
 class BettingStrategy(ABC):
 
@@ -71,10 +77,16 @@ class BettingStrategy(ABC):
     def bet(self, *args: Any, **kwargs: Any) -> float:
         pass
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__qualname__}()"
 
-class FixedBettingStrategy:
+
+class FixedBettingStrategy(BettingStrategy):
     def __init__(self, betsize: float) -> None:
         self.betsize = betsize
 
     def bet(self, *args: Any, **kwargs: Any):
         return self.betsize
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__qualname__}({self.betsize})"
