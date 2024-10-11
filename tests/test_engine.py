@@ -164,7 +164,7 @@ def test_two_blackjacks_equal():
 class TestPlayer:
 
     @pytest.fixture
-    def player():
+    def player(self):
         return Player(RandomStrategy(), FixedBettingStrategy(10), 100)
 
     def test_cash_credits(self, player: Player):
