@@ -6,7 +6,7 @@ from enum import Enum
 from functools import cached_property, partial, wraps
 from typing import Any, Callable, Literal, Self
 
-from .strategies import DealerStrategy, GameStrategy
+from .strategies import BettingStrategy, DealerStrategy, GameStrategy
 
 # ### Rules ###
 MAX_SPLITS = -1  # negative number means no limit
@@ -118,10 +118,10 @@ class Hand(list[Card]):
 
     @property
     def value(self) -> int:
-        if (v := max(self.hard_value, self.soft_value)) <= 21:
+        if (v := max(self.hard_value, (sv := self.soft_value))) <= 21:
             return v
         else:
-            return self.soft_value
+            return sv
 
     @property
     def hard_value(self) -> int:
@@ -147,17 +147,16 @@ class Hand(list[Card]):
         return (len(self) == 2) and self._has_face() and self._has_ace()
 
     def can_split(self) -> bool:
-
         return (len(self) == 2) and (
             (self[0].rank == self[1].rank)
             or all([(card.rank in FACES) for card in self])
         )
 
     def value_str(self) -> str:
-        if self.hard_value != self.soft_value:
-            return f"{self.soft_value}/{self.hard_value}"
+        if (hv := self.hard_value) != (sv := self.soft_value):
+            return f"{hv}/{sv}"
         else:
-            return str(self.value)
+            return str(sv)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Hand):
@@ -209,18 +208,6 @@ class Hand(list[Card]):
         return ", ".join(map(str, self))
 
 
-class BettingStrategy:
-
-    def bet(self):
-        pass
-
-    def register_win(self):
-        pass
-
-    def register_loss(self):
-        pass
-
-
 @dataclass
 class HandPlay:
     """
@@ -237,6 +224,9 @@ class HandPlay:
 
     def __post_init__(self):
         pass
+
+    def charge_bet(self) -> None:
+        self.player.charge(self.betsize)
 
     @property
     def is_done(self) -> bool:
@@ -255,8 +245,13 @@ class HandPlay:
     def done(self) -> None:
         self._is_done = True
 
-    def surrender(self):
+    def surrender(self, *args) -> Literal[-1, 0, 1]:
         pass
+
+    def insure(self, dealer_hand: Hand) -> None:
+        if self.player.strategy.insurance(dealer_hand, self.hand):
+            self.player.cash.charge(self.betsize)
+            self.insurance = True
 
     def eval_hand(self, dealer_hand: Hand) -> Literal[-1, 0, 1]:
         if self.hand > dealer_hand:
@@ -267,9 +262,6 @@ class HandPlay:
             return 0
         else:
             raise ValueError("How the fuck did we get here?")
-
-    def eval_surrender(self, *args) -> Literal[-1, 0, 1]:
-        pass
 
     def eval_insurance(self, dealer_hand: Hand) -> Literal[-1, 0, 1]:
         if dealer_hand.is_blackjack():
@@ -297,32 +289,43 @@ class HandPlay:
         ]
 
 
-class FaltaDinero(Exception):
+class NotEnoughCash(Exception):
     pass
 
 
-class Cash(float):
+class Cash:
+
+    def __init__(self, balance: float):
+        if balance < 0:
+            raise ValueError("Initial cash value must be greater than zero.")
+        self.balance = balance
 
     def check_amount(self, amount: float) -> float:
-        if amount < self:
-            raise FaltaDinero("Not enough cash")
+        if amount > self.balance:
+            raise NotEnoughCash("Not enough cash")
         else:
             return amount
 
     def charge(self, amount: float) -> float:
-        self -= self.check_amount(amount)
-        return amount
+        self.balance -= self.check_amount(amount)
+        return self.balance
 
     def credit(self, amount: float) -> float:
-        self += amount
-        return amount
+        self.balance += amount
+        return self.balance
+
+    __iadd__ = credit
+    __isub__ = charge
+
+    def __eq__(self, value: object) -> bool:
+        return self.balance == value
 
 
 @dataclass
 class Dealer:
     shoe: Shoe = field(default_factory=partial(Shoe, NUMBER_OF_DECKS))
     hand: Hand = field(default_factory=Hand)
-    game_strategy: GameStrategy = DealerStrategy()
+    game_strategy: DealerStrategy = DealerStrategy()
 
     def deal(self, hand: Hand):
         hand += self.shoe.pop()
@@ -337,16 +340,22 @@ class Dealer:
 
 @dataclass
 class Player:
-    game_strategy: GameStrategy
+    strategy: GameStrategy
     betting_strategy: BettingStrategy
-    cash: Cash = Cash(PLAYER_CASH)
+    cash: Cash = field(default_factory=partial(Cash, PLAYER_CASH))
 
     @property
     def will_continue(self) -> bool:
         return True
 
+    def charge(self, amount: float) -> None:
+        self.cash.charge(amount)
 
-# DECIDE HOW YOU WANT CASH HANDLES, IT'S NOT DONE
+    def credit(self, amount: float) -> None:
+        self.cash.credit(amount)
+
+
+# DECIDE HOW YOU WANT CASH HANDLED, IT'S NOT DONE
 
 
 @dataclass
@@ -356,13 +365,14 @@ class Table:
     @staticmethod
     def all_hands(func: Callable[..., bool | None]) -> Callable[..., bool | None]:
         """
-        Decorator, which if applied to a method will call this method on all objects in
+        Decorator, which if applied to a method, will call this method on all objects in
         self.hands.
         """
 
         @wraps(func)
         def wrapper(self: Table, dealer: Dealer) -> None:
             # self.hands may be modified during iteration!
+            # works now but careful!
             for hand_play in self.hands:
                 func(dealer, hand_play)
 
@@ -393,7 +403,7 @@ class Table:
         def wrapper(self: Table, dealer: Dealer, hand_play: HandPlay):
             try:
                 hand_play.player.cash.check_amount(hand_play.betsize)
-            except FaltaDinero:
+            except NotEnoughCash:
                 return
 
             if func(dealer, hand_play):
@@ -402,11 +412,10 @@ class Table:
         return wrapper
 
     @all_hands
-    @charge_bet
     def insurance(self, dealer: Dealer, hand_play: HandPlay) -> bool:
-        if hand_play.player.game_strategy.insurance(dealer.hand, hand_play.hand):
+        if hand_play.player.strategy.insurance(dealer.hand, hand_play.hand):
             # check if cash available
-            hand_play.player.cash -= hand_play.betsize
+            hand_play.player.cash.charge(hand_play.betsize)
             hand_play.insurance = True
             return True
         return False
@@ -425,10 +434,9 @@ class Table:
         # hit
         self.hit(dealer, hand_play)
 
-    @charge_bet
     @check_if_done_first
     def split(self, dealer: Dealer, hand_play: HandPlay) -> bool:
-        if hand_play.can_split() and hand_play.player.game_strategy.split(
+        if hand_play.can_split() and hand_play.player.strategy.split(
             dealer.hand, hand_play.hand
         ):
             hand_play.player.cash -= hand_play.betsize
@@ -444,10 +452,9 @@ class Table:
             return True
         return False
 
-    @charge_bet
     @check_if_done_first
     def double(self, dealer: Dealer, hand_play: HandPlay) -> bool:
-        if hand_play.player.game_strategy.double(dealer.hand, hand_play.hand):
+        if hand_play.player.strategy.double(dealer.hand, hand_play.hand):
             hand_play.player.cash -= hand_play.betsize
             hand_play.betsize *= 2
             dealer.deal(hand_play.hand)
@@ -458,7 +465,7 @@ class Table:
     @check_if_done_first
     def hit(self, dealer: Dealer, hand_play: HandPlay) -> bool:
         while (not hand_play.is_done) and (
-            hand_play.player.game_strategy.hit(dealer.hand, hand_play.hand)
+            hand_play.player.strategy.hit(dealer.hand, hand_play.hand)
         ):
             dealer.deal(hand_play.hand)
         hand_play.done()
@@ -535,6 +542,6 @@ class Game:
     def __post_init__(self):
         self.round = Round(self.shoe, self.dealer, self.players)
 
-    def play(self):
+    def loop_play(self):
         while True:
             self.round = self.round.play()
