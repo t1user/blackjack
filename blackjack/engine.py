@@ -22,7 +22,7 @@ NUMBER_OF_DECKS = 6
 PLAYER_CASH = 1_000
 BLACKJACK_PAYOUT = 3 / 2
 TABLE_LIMITS = (5, 50)
-SURRENDER = True
+SURRENDER = True  # No extra conditions
 DOUBLE_ON_SPLIT = True
 # ### End-rules ###
 
@@ -295,7 +295,7 @@ class HandPlay:
     _losses: float = field(default=0, repr=False)
 
     def __post_init__(self):
-        self._losses += self.betsize
+        self._losses = -self.betsize
 
     @classmethod
     def from_player(cls, player: Player) -> Self | None:
@@ -409,29 +409,23 @@ class HandPlay:
             dealer.deal(self)
         self.done()
 
-    def eval_hand(self, dealer: Dealer) -> Literal[-1, 0, 1]:
+    def eval_hand(self, dealer: Dealer) -> None:
         dealer_hand = dealer.hand
         if self.hand > dealer_hand:
-            self.credit_bet(2)
-            return 1
-        elif self.hand < dealer_hand:
-            return -1
+            if self.hand.is_blackjack():
+                self.credit_bet(2.5)
+            else:
+                self.credit_bet(2)
         elif self.hand == dealer_hand:
             self.credit_bet(1)
-            return 0
-        else:
-            raise GameError("Ambigous outcome of hand evaluation.")
 
-    def eval_insurance(self, dealer_hand: Hand) -> bool:
+    def eval_insurance(self, dealer: Dealer) -> None:
+        dealer_hand = dealer.hand
         if dealer_hand.is_blackjack():
             if self.hand.is_blackjack():
                 self.credit_bet(1)
-                return True
             else:
-                self.credit_bet(1.5)
-                return True
-        else:
-            return False
+                self.credit_bet(2)
 
     def __iadd__(self, card: Card) -> Self:
         self.hand.append(card)
@@ -512,8 +506,8 @@ class TablePlay:
         if new_hands is not None:
             try:
                 assert isinstance(new_hands, list)
-            except AssertionError:
-                raise GameError("Split gone wrong.")
+            except AssertionError as e:
+                raise GameError("Split gone wrong.") from e
 
             hand_index = self.hands.index(hand_play)
             self.hands.remove(hand_play)
@@ -521,11 +515,11 @@ class TablePlay:
 
     @all_hands
     def eval_insurance(self, dealer: Dealer, hand_play: HandPlay) -> None:
-        pass
+        hand_play.eval_insurance(dealer)
 
     @all_hands
     def eval_hands(self, dealer: Dealer, hand_play: HandPlay) -> None:
-        pass
+        hand_play.eval_hand(dealer)
 
 
 @dataclass
