@@ -63,6 +63,24 @@ class MimickDealer(GameStrategy):
         return player_hand.soft_value <= 17
 
 
+class ManualGameStrategy(GameStrategy):
+
+    def surrender(self, dealer_hand: Hand, player_hand: Hand) -> bool:
+        pass
+
+    def insurance(self, dealer_hand: Hand, player_hand: Hand) -> bool:
+        pass
+
+    def split(self, dealer_hand: Hand, player_hand: Hand) -> bool:
+        pass
+
+    def double(self, dealer_hand: Hand, player_hand: Hand) -> bool:
+        pass
+
+    def hit(self, dealer_hand: Hand, player_hand: Hand) -> bool:
+        pass
+
+
 class DealerStrategy:
     def hit(self, dealer_hand: Hand) -> bool:
         return dealer_hand.soft_value < 17

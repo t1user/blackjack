@@ -353,42 +353,29 @@ class HandPlay:
         self._is_done = True
         self.player.credit(self._winnings)
 
-    def surrender(self, dealer: Dealer) -> bool:
+    def surrender(self, dealer: Dealer) -> None:
         if self.can_surrender() and self.player.strategy.surrender(
             dealer.hand, self.hand
         ):
             self.credit_bet(0.5)
             self.done()
-            return True
-        return False
 
-    def place_insurance(self, dealer: Dealer) -> bool:
+    def place_insurance(self, dealer: Dealer) -> None:
         if self.player.strategy.insurance(dealer.hand, self.hand):
-            if self.hand.is_blackjack():
-                self.credit_bet(1)
-                self.done()
-                return True
-            else:
-                try:
-                    self.charge_bet()
-                    self.insurance = True
-                    return True
-                except NotEnoughCash:
-                    return False
-        else:
-            return False
+            try:
+                self.charge_bet()
+                self.insurance = True
+            except NotEnoughCash:
+                pass
 
-    def double(self, dealer: Dealer) -> bool:
+    def double(self, dealer: Dealer) -> None:
         if self.can_double() and self.player.strategy.double(dealer.hand, self.hand):
             try:
                 self.charge_bet(1)
                 dealer.deal(self)
                 self.done()
-                return True
             except NotEnoughCash:
-                return False
-        else:
-            return False
+                pass
 
     def split(self, dealer: Dealer) -> list[HandPlay] | None:
         if self.can_split() and self.player.strategy.split(dealer.hand, self.hand):
@@ -423,9 +410,9 @@ class HandPlay:
         dealer_hand = dealer.hand
         if dealer_hand.is_blackjack():
             if self.hand.is_blackjack():
-                self.credit_bet(1)
+                self.credit_bet(2.5)
             else:
-                self.credit_bet(2)
+                self.credit_bet(1.5)
 
     def __iadd__(self, card: Card) -> Self:
         self.hand.append(card)
