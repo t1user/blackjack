@@ -306,16 +306,16 @@ class HandPlay:
             player.cash += betsize
 
     @staticmethod
-    def check_if_done_first(func: Callable[..., T]) -> Callable[..., T | None]:
+    def check_if_done_first(func: Callable[..., T]) -> Callable[..., T | bool]:
         """
         Decorator, which will cause the method to immediately return if it's applied
         on a HandPlay object with .is_done property evaluating to True.
         """
 
         @wraps(func)
-        def wrapper(self: HandPlay, dealer_hand: Hand):
+        def wrapper(self: HandPlay, dealer_hand: Hand) -> T | bool:
             if self.is_done:
-                return None
+                return False
             else:
                 return func(self, dealer_hand)
 
@@ -330,6 +330,10 @@ class HandPlay:
         self._winnings += self.betsize * bet_multiple
 
     @property
+    def allowed_choices(self) -> tuple[bool, bool, bool, bool]:
+        return (self.can_stand(), self.can_split(), self.can_double(), self.can_hit())
+
+    @property
     def result(self) -> float:
         if self.is_done:
             return self._winnings + self._losses
@@ -337,10 +341,15 @@ class HandPlay:
             return 0
 
     @property
+    def is_bust(self):
+        return self.hand.is_bust()
+
+    @property
     def is_done(self) -> bool:
         return (
+            self.is_bust
             # no resplits on double aces if not allowed
-            (bool(self.splits) and RESPLIT_ACES and self.hand.is_double_aces())
+            or (bool(self.splits) and RESPLIT_ACES and self.hand.is_double_aces())
             # is blackjack
             or self.hand.is_blackjack()
             # is 21
@@ -431,11 +440,17 @@ class HandPlay:
             return True
 
     @check_if_done_first
-    def can_split(self):
+    def can_split(self) -> bool:
         if self.splits > MAX_SPLITS:
             return False
         else:
             return self.hand.can_split()
+
+    def can_hit(self) -> bool:
+        return self.is_done
+
+    def can_stand(self) -> bool:
+        return self.is_done
 
     @classmethod
     def _split(
