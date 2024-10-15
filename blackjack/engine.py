@@ -4,7 +4,7 @@ import random
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import cached_property, partial, wraps
-from typing import Any, Callable, Literal, Self, TypeVar
+from typing import Any, Callable, ClassVar, Literal, Self, TypeVar
 
 from .strategies import (
     BettingStrategy,
@@ -218,6 +218,8 @@ class Hand(list[Card]):
     def __str__(self) -> str:
         return ", ".join(map(str, self))
 
+    __repr__ = __str__
+
 
 @dataclass
 class Dealer:
@@ -246,6 +248,9 @@ class Dealer:
             )
         else:
             return self.hand[0].is_ace
+
+    def __repr__(self) -> str:
+        return f"Dealer(hand={str(self.hand)})"
 
 
 @dataclass
@@ -308,16 +313,16 @@ class HandPlay:
     @staticmethod
     def check_if_done_first(func: Callable[..., T]) -> Callable[..., T | bool]:
         """
-        Decorator, which will cause the method to immediately return if it's applied
-        on a HandPlay object with .is_done property evaluating to True.
+        Decorator, will prevent calling a function when hand is already done.
+        Can be applied to methods that don't accept arguments.
         """
 
         @wraps(func)
-        def wrapper(self: HandPlay, dealer_hand: Hand) -> T | bool:
+        def wrapper(self: HandPlay) -> T | bool:
             if self.is_done:
                 return False
             else:
-                return func(self, dealer_hand)
+                return func(self)
 
         return wrapper
 
@@ -346,21 +351,22 @@ class HandPlay:
 
     @property
     def is_done(self) -> bool:
-        return (
-            self.is_bust
+        self._is_done = (
+            # has manually been set to done
+            self._is_done
+            # is bust
+            or self.is_bust
             # no resplits on double aces if not allowed
             or (bool(self.splits) and RESPLIT_ACES and self.hand.is_double_aces())
             # is blackjack
             or self.hand.is_blackjack()
             # is 21
             or self.hand.value == 21
-            # has manually been set to done
-            or self._is_done
         )
+        return self._is_done
 
     def done(self) -> None:
         self._is_done = True
-        self.player.credit(self._winnings)
 
     def surrender(self, dealer: Dealer) -> None:
         if self.can_surrender() and self.player.strategy.surrender(
@@ -369,7 +375,7 @@ class HandPlay:
             self.credit_bet(0.5)
             self.done()
 
-    def place_insurance(self, dealer: Dealer) -> None:
+    def play_insurance(self, dealer: Dealer) -> None:
         if self.player.strategy.insurance(dealer.hand, self.hand):
             try:
                 self.charge_bet()
@@ -377,20 +383,24 @@ class HandPlay:
             except NotEnoughCash:
                 pass
 
-    def double(self, dealer: Dealer) -> None:
+    def play(self, dealer: Dealer) -> list[Self] | Self | None:
+        return self.split(dealer) or self.double(dealer) or self.hit(dealer)
+
+    def double(self, dealer: Dealer) -> Self | None:
         if self.can_double() and self.player.strategy.double(dealer.hand, self.hand):
             try:
                 self.charge_bet(1)
                 dealer.deal(self)
                 self.done()
+                return self
             except NotEnoughCash:
                 pass
 
-    def split(self, dealer: Dealer) -> list[HandPlay] | None:
+    def split(self, dealer: Dealer) -> list[Self] | None:
         if self.can_split() and self.player.strategy.split(dealer.hand, self.hand):
             try:
                 self.charge_bet()
-                new_hands = HandPlay._split(
+                new_hands = self.__class__._split(
                     self.betsize, self.player, self.hand, self.splits
                 )
                 for hand_play in new_hands:
@@ -399,11 +409,11 @@ class HandPlay:
             except NotEnoughCash:
                 pass
 
-    @check_if_done_first
-    def hit(self, dealer: Dealer) -> None:
+    def hit(self, dealer: Dealer) -> Self:
         while (not self.is_done) and (self.player.strategy.hit(dealer.hand, self.hand)):
             dealer.deal(self)
         self.done()
+        return self
 
     def eval_hand(self, dealer: Dealer) -> None:
         dealer_hand = dealer.hand
@@ -414,6 +424,7 @@ class HandPlay:
                 self.credit_bet(2)
         elif self.hand == dealer_hand:
             self.credit_bet(1)
+        self.player.credit(self._winnings)
 
     def eval_insurance(self, dealer: Dealer) -> None:
         dealer_hand = dealer.hand
@@ -427,30 +438,34 @@ class HandPlay:
         self.hand.append(card)
         return self
 
-    @check_if_done_first
     def can_surrender(self) -> bool:
         # override to enter surrender conditions
-        return True
-
-    @check_if_done_first
-    def can_double(self) -> bool:
-        if (not DOUBLE_ON_SPLIT) and self.splits:
+        if self.is_done:
             return False
         else:
             return True
 
-    @check_if_done_first
+    def can_double(self) -> bool:
+        if self.is_done:
+            return False
+        elif (not DOUBLE_ON_SPLIT) and self.splits:
+            return False
+        else:
+            return True
+
     def can_split(self) -> bool:
-        if self.splits > MAX_SPLITS:
+        if self.is_done:
+            return False
+        elif self.splits > MAX_SPLITS:
             return False
         else:
             return self.hand.can_split()
 
     def can_hit(self) -> bool:
-        return self.is_done
+        return not self.is_done
 
     def can_stand(self) -> bool:
-        return self.is_done
+        return True
 
     @classmethod
     def _split(
@@ -464,64 +479,55 @@ class HandPlay:
 
 @dataclass
 class TablePlay:
-    hands: list[HandPlay] = field(default_factory=list)
+    _hands: list[HandPlay] = field(default_factory=list, repr=False)
+    _done: list[HandPlay] = field(default_factory=list, init=False, repr=False)
+    _methods: ClassVar = (
+        "surrender",
+        "play_insurance",
+        "double",
+        "split",
+        "hit",
+        "eval_hand",
+        "eval_insurance",
+    )
 
-    @staticmethod
-    def all_hands(func: Callable[..., bool | None]) -> Callable[..., bool | None]:
-        """
-        Decorator, which if applied to a method, will call this method on all objects in
-        self.hands.
-        """
+    def __iter__(self) -> Self:
+        return self
 
-        @wraps(func)
-        def wrapper(self: TablePlay, dealer: Dealer) -> None:
-            # self.hands may be modified during iteration!
-            # works now but careful!
-            for hand_play in self.hands:
-                func(dealer, hand_play)
+    def __next__(self) -> HandPlay:
+        try:
+            return self._hands.pop()
+        except IndexError:
+            self._hands = self._done
+            self._done = []
+            print(f"table reset")
+            raise StopIteration
 
-        return wrapper
+    def __getattr__(self, name: str):
+        if name in self._methods:
+            return partial(self.run_all_hands, name)
+        else:
+            raise AttributeError
+
+    def run_all_hands(self, name: str, dealer: Dealer):
+        for hand_play in self:
+            method = getattr(hand_play, name)
+            hands_or_hand = method(dealer)
+            if hasattr(hands_or_hand, "__iter__"):
+                self._hands.extend(hands_or_hand)
+            else:
+                self._done.append(hand_play)
+
+    @property
+    def hands(self):
+        return [*self._hands, *self._done]
 
     def deal_card(self, dealer: Dealer):
         for hand in self.hands:
             dealer.deal(hand)
 
-    @all_hands
-    def surrender(self, dealer: Dealer, hand_play: HandPlay) -> None:
-        hand_play.surrender(dealer)
-
-    @all_hands
-    def offer_insurance(self, dealer: Dealer, hand_play: HandPlay) -> None:
-        hand_play.place_insurance(dealer)
-
-    @all_hands
-    def play(self, dealer: Dealer, hand_play: HandPlay) -> None:
-        # split
-        self.split(dealer, hand_play)
-        # double
-        hand_play.double(dealer)
-        # hit
-        hand_play.hit(dealer)
-
-    def split(self, dealer: Dealer, hand_play: HandPlay) -> None:
-        new_hands = hand_play.split(dealer)
-        if new_hands is not None:
-            try:
-                assert isinstance(new_hands, list)
-            except AssertionError as e:
-                raise GameError("Split gone wrong.") from e
-
-            hand_index = self.hands.index(hand_play)
-            self.hands.remove(hand_play)
-            self.hands[hand_index:hand_index] = self.hands
-
-    @all_hands
-    def eval_insurance(self, dealer: Dealer, hand_play: HandPlay) -> None:
-        hand_play.eval_insurance(dealer)
-
-    @all_hands
-    def eval_hands(self, dealer: Dealer, hand_play: HandPlay) -> None:
-        hand_play.eval_hand(dealer)
+    def __repr__(self) -> str:
+        return f"TablePlay(hands={self.hands})"
 
 
 @dataclass
@@ -546,7 +552,19 @@ class Round:
 
     def offer_insurance(self) -> Self:
         if self.dealer.has_ace:
-            self.table.offer_insurance(self.dealer)
+            self.table.play_insurance(self.dealer)
+        return self
+
+    def split(self) -> Self:
+        self.table.split(self.dealer)
+        return self
+
+    def double(self) -> Self:
+        self.table.double(self.dealer)
+        return self
+
+    def hit(self) -> Self:
+        self.table.hit(self.dealer)
         return self
 
     def player_play(self) -> Self:
@@ -562,7 +580,7 @@ class Round:
         return self
 
     def eval_hands(self) -> Self:
-        self.table.eval_hands(self.dealer)
+        self.table.eval_hand(self.dealer)
         return self
 
     def play(self) -> Self:
@@ -571,7 +589,9 @@ class Round:
             .deal()
             .offer_surrender()
             .offer_insurance()
-            .player_play()
+            .split()
+            .double()
+            .hit()
             .dealer_play()
             .eval_insurance()
             .eval_hands()
