@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import random
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from functools import wraps
+from typing import TYPE_CHECKING, Any, Callable, Literal
 
 if TYPE_CHECKING:
     from .engine import Hand
@@ -63,24 +64,6 @@ class MimickDealer(GameStrategy):
         return player_hand.soft_value <= 17
 
 
-class ManualGameStrategy(GameStrategy):
-
-    def surrender(self, dealer_hand: Hand, player_hand: Hand) -> bool:
-        pass
-
-    def insurance(self, dealer_hand: Hand, player_hand: Hand) -> bool:
-        pass
-
-    def split(self, dealer_hand: Hand, player_hand: Hand) -> bool:
-        pass
-
-    def double(self, dealer_hand: Hand, player_hand: Hand) -> bool:
-        pass
-
-    def hit(self, dealer_hand: Hand, player_hand: Hand) -> bool:
-        pass
-
-
 class DealerStrategy:
     def hit(self, dealer_hand: Hand) -> bool:
         return dealer_hand.soft_value < 17
@@ -103,7 +86,7 @@ class FixedBettingStrategy(BettingStrategy):
     def __init__(self, betsize: float) -> None:
         self.betsize = betsize
 
-    def bet(self, *args: Any, **kwargs: Any):
+    def bet(self, *args: Any, **kwargs: Any) -> float:
         return self.betsize
 
     def __repr__(self) -> str:
