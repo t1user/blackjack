@@ -1,6 +1,17 @@
 import pytest
 
-from blackjack.engine import DECK, Card, Hand, NotEnoughCash, Player, Shoe
+from blackjack.engine import (
+    DECK,
+    Card,
+    Dealer,
+    GameStrategy,
+    Hand,
+    HandPlay,
+    NotEnoughCash,
+    PlayDecision,
+    Player,
+    Shoe,
+)
 from blackjack.strategies import FixedBettingStrategy, RandomStrategy
 
 
@@ -16,12 +27,12 @@ def test_Card_cannot_be_instantiated_with_wrong_rank():
 
 def test_ace_value():
     ace_card = Card("A", "H")
-    assert ace_card.value == 11
+    assert ace_card.value == 1
 
 
 def test_ace_soft_value():
     ace_card = Card("A", "D")
-    assert ace_card.soft_value == 1
+    assert ace_card.soft_value == 11
 
 
 def test_king_is_a_ten():
@@ -62,6 +73,10 @@ def test_shoe_has_correct_number_of_cards():
     assert len(shoe) == 6 * 52
 
 
+def test_empty_hand_has_value_zero():
+    assert Hand().value == 0
+
+
 @pytest.fixture
 def two_card_hand() -> Hand:
     return Hand(Card("5", "D"), Card("9", "H"))
@@ -95,17 +110,76 @@ def test_blackjack_cannot_split():
     assert not Hand(Card("A", "H"), Card("K", "D")).can_split()
 
 
-def test_hand_with_ace_hard_value():
-    # It's (10, 20) so if no more cards taken the value that matters is 20
+def test_hand_with_ace_value():
+    # It's (10/20) so if no more cards taken the value that matters is 20
     assert Hand(Card("A", "D"), Card("9", "H")).value == 20
 
 
-def test_hand_with_ace_soft_value():
+def test_hand_with_ace_value_1():
     assert Hand(Card("A", "D"), Card("9", "H"), Card("8", "C")).value == 18
 
 
+def test_hand_with_ace_value_2():
+    assert Hand(Card("2", "S"), Card("A", "C"), Card("J", "C")).value == 13
+
+
+def test_hand_with_ace_hard_value():
+    assert Hand(Card("A", "D"), Card("9", "H")).hard_value == 10
+
+
+def test_hand_with_ace_soft_value():
+    assert Hand(Card("A", "D"), Card("9", "H")).soft_value == 20
+
+
+def test_double_aces_is_12():
+    assert Hand(Card("A", "D"), Card("A", "H")).value == 12
+
+
+def test_double_aces_not_bust():
+    assert not Hand(Card("A", "D"), Card("A", "H")).is_bust()
+
+
+def test_hand_with_multiple_aces_value():
+    assert (
+        Hand(
+            Card("A", "D"),
+            Card("A", "H"),
+            Card("A", "S"),
+            Card("A", "C"),
+            Card("3", "C"),
+        ).value
+        == 17
+    )
+
+
+def test_hand_with_multiple_aces_soft_value():
+    assert (
+        Hand(
+            Card("A", "D"),
+            Card("A", "H"),
+            Card("A", "S"),
+            Card("A", "C"),
+            Card("3", "C"),
+        ).soft_value
+        == 17
+    )
+
+
+def test_hand_with_multiple_aces_hard_value():
+    assert (
+        Hand(
+            Card("A", "D"),
+            Card("A", "H"),
+            Card("A", "S"),
+            Card("A", "C"),
+            Card("3", "C"),
+        ).hard_value
+        == 7
+    )
+
+
 def test_not_bust_with_ace():
-    # hard value is bust but soft not
+    # soft value is bust but hard not
     assert not Hand(Card("A", "D"), Card("9", "H"), Card("8", "C")).is_bust()
 
 
@@ -114,6 +188,10 @@ def test_bust_with_ace():
     assert Hand(
         Card("A", "D"), Card("9", "H"), Card("8", "C"), Card("10", "D")
     ).is_bust()
+
+
+def test_can_split_double_aces():
+    assert Hand(Card("A", "D"), Card("A", "H")).can_split()
 
 
 def test_Hand_eq():
@@ -186,3 +264,305 @@ class TestPlayer:
         except NotEnoughCash:
             pass
         assert player.cash == 100
+
+
+class TestHandPlay:
+
+    @pytest.fixture
+    def random_player(self):
+        return Player(RandomStrategy(), FixedBettingStrategy(5))
+
+    @pytest.fixture
+    def hand_play(self, random_player: Player):
+        return HandPlay.from_player(random_player)
+
+    @pytest.fixture
+    def dealer(self):
+        return Dealer()
+
+    # every PlayDecision is next power of 2:
+    # HIT: 1
+    # SPLIT: 2
+    # DOUBLE: 4
+    # STAND: 8
+    # SURRENDER: 16
+    # value of allowed_choices is the numerical sum of available options
+
+    def test_double_aces_can_split(self, hand_play: HandPlay):
+        hand_play += Card("A", "H")
+        hand_play += Card("A", "S")
+        assert hand_play.allowed_choices.value == 31  # type: ignore
+
+    def test_three_cards_cannot_split_double_or_surrender(self, hand_play: HandPlay):
+        hand_play += Card("A", "H")
+        hand_play += Card("A", "S")
+        hand_play += Card("K", "H")
+        assert hand_play.allowed_choices.value == 9  # type: ignore
+
+    def test_non_pair_cannot_split(self, hand_play: HandPlay):
+        hand_play += Card("A", "S")
+        hand_play += Card("9", "H")
+        assert hand_play.allowed_choices.value == 29  # type: ignore
+
+    # Return value is None if the hand is done or HandPlay/multiple HandPlays otherwise
+    def test_hit(self, hand_play: HandPlay, dealer: Dealer):
+        hand_play += Card("A", "S")
+        hand_play += Card("9", "H")
+        cards = hand_play.hand.copy()
+        return_value = hand_play.hit(dealer)
+        assert len(hand_play.hand) == 3
+        assert cards[0] in hand_play.hand
+        assert cards[1] in hand_play.hand
+        assert isinstance(return_value, HandPlay)
+
+    def test_stand(self, hand_play: HandPlay, dealer: Dealer):
+        hand_play += Card("A", "S")
+        hand_play += Card("9", "H")
+        cards = hand_play.hand.copy()
+        return_value = hand_play.stand(dealer)
+        assert len(hand_play.hand) == 2
+        assert cards[0] in hand_play.hand
+        assert cards[1] in hand_play.hand
+        assert hand_play.is_done
+        assert return_value is None
+
+    def test_surrender_is_done(self, hand_play: HandPlay, dealer: Dealer):
+        hand_play += Card("A", "S")
+        hand_play += Card("9", "H")
+        hand_play.surrender(dealer)
+        assert hand_play.is_done
+
+    def test_surrender_charges_half_bet(self, hand_play: HandPlay, dealer: Dealer):
+        hand_play += Card("A", "S")
+        hand_play += Card("9", "H")
+        betsize = hand_play.betsize
+        hand_play.surrender(dealer)
+        assert hand_play.result == -0.5 * betsize
+
+    def test_double(self, hand_play: HandPlay, dealer: Dealer):
+        hand_play += Card("A", "S")
+        hand_play += Card("9", "H")
+        cards = hand_play.hand.copy()
+        return_value = hand_play.double(dealer)
+        assert len(hand_play.hand) == 3
+        assert cards[0] in hand_play.hand
+        assert cards[1] in hand_play.hand
+        assert hand_play.is_done
+        assert return_value is None
+
+    def test_double_charges_player(self, hand_play: HandPlay, dealer: Dealer):
+        hand_play += Card("A", "S")
+        hand_play += Card("9", "H")
+        starting_cash = hand_play.player.cash
+        betsize = hand_play.betsize
+        hand_play.double(dealer)
+        assert hand_play.player.cash + betsize == starting_cash
+
+    def test_split_returns_list_of_two_cards(self, hand_play: HandPlay, dealer: Dealer):
+        hand_play += Card("A", "S")
+        hand_play += Card("A", "H")
+        return_value = hand_play.split(dealer)
+        assert isinstance(return_value, list)
+        assert len(return_value) == 2
+
+    def test_split_charges_player(self, hand_play: HandPlay, dealer: Dealer):
+        hand_play += Card("A", "S")
+        hand_play += Card("A", "H")
+        starting_cash = hand_play.player.cash
+        betsize = hand_play.betsize
+        hand_play.split(dealer)
+        assert hand_play.player.cash + betsize == starting_cash
+
+    def test_split_returned_first_hand(self, hand_play: HandPlay, dealer: Dealer):
+        hand_play += Card("A", "S")
+        hand_play += Card("A", "H")
+        cards = hand_play.hand.copy()
+        return_value = hand_play.split(dealer)
+        testing_card = cards[0]
+        testing_hand = return_value[0]
+        assert isinstance(testing_hand, HandPlay)
+        assert len(testing_hand.hand) == 2
+        assert testing_card in testing_hand.hand
+        assert testing_hand.splits == 1
+
+    def test_split_returned_second_hand(self, hand_play: HandPlay, dealer: Dealer):
+        hand_play += Card("A", "S")
+        hand_play += Card("A", "H")
+        cards = hand_play.hand.copy()
+        return_value = hand_play.split(dealer)
+        testing_card = cards[1]
+        testing_hand = return_value[1]
+        assert isinstance(testing_hand, HandPlay)
+        assert len(testing_hand.hand) == 2
+        assert testing_card in testing_hand.hand
+        assert testing_hand.splits == 1
+
+    def test_one_hand_inherits_insurance_after_split(
+        self, hand_play: HandPlay, dealer: Dealer
+    ):
+        hand_play += Card("A", "S")
+        hand_play += Card("A", "H")
+        hand_play.insurance = 5
+        return_value = hand_play.split(dealer)
+        assert return_value[0].insurance == 5
+        assert return_value[1].insurance == 0
+
+    def test_no_blackjack_after_split(self, hand_play: HandPlay):
+
+        class DeterminedDealer(Dealer):
+            def deal(self, hand: Hand | HandPlay):
+                hand += Card("K", "S")
+
+        dealer = DeterminedDealer()
+
+        hand_play += Card("A", "S")
+        hand_play += Card("A", "H")
+        return_value = hand_play.split(dealer)
+        test_hand = return_value[0]
+        assert not test_hand.hand.is_blackjack()
+
+    def test_eval_insurance(self, hand_play: HandPlay):
+
+        dealer = Dealer(hand=Hand(Card("A", "S"), Card("K", "H")))
+
+        hand_play += Card("A", "S")
+        hand_play += Card("9", "H")
+        # insurance is never actually charged to player in this test
+        hand_play.insurance = 1
+        start_cash = hand_play.player.cash
+        # this is won (player not credited yet)
+        hand_play.eval_insurance(dealer)
+        # this is lost, but it actually settles accounts with player
+        # i.e. credits insurance won
+        hand_play.eval_hand(dealer)
+        # we haven't charged anything in this mock situation
+        # full test with charging below
+        end_cash = hand_play.player.cash
+        # insurance was not charged so final cash is higher than in reality
+        assert end_cash == start_cash + hand_play.insurance * 3
+
+    @pytest.fixture
+    def always_insuring_player(self):
+        class PositiveInsuranceGameStrategy(RandomStrategy):
+            def insurance(self, dealer_hand: Hand, player_hand: Hand):
+                return True
+
+        return Player(PositiveInsuranceGameStrategy(), FixedBettingStrategy(5))
+
+    def test_insurance_full(self, always_insuring_player: Player):
+        player = always_insuring_player
+        start_cash = player.cash  # before bet was charged
+        hand_play = HandPlay.from_player(player)  # bet charged here
+        assert hand_play
+
+        dealer = Dealer(hand=Hand(Card("A", "S"), Card("K", "H")))
+
+        hand_play += Card("A", "S")
+        hand_play += Card("9", "H")
+
+        hand_play.play_insurance(dealer)  # insurance charged here
+        # this is won
+        hand_play.eval_insurance(dealer)
+        # this is lost (and accounts are settled)
+        hand_play.eval_hand(dealer)
+        end_cash = player.cash
+        # insurance won compensates hand lost
+        assert end_cash == start_cash
+
+    def test_insurance_full_player_blackjack(self, always_insuring_player: Player):
+        player = always_insuring_player
+        start_cash = player.cash  # before bet was charged
+
+        hand_play = HandPlay.from_player(player)  # bet is charged here
+        assert hand_play
+
+        dealer = Dealer(hand=Hand(Card("A", "S"), Card("K", "H")))
+
+        hand_play += Card("A", "S")
+        hand_play += Card("J", "H")
+
+        hand_play.play_insurance(dealer)  # insurance is charged here
+
+        # this is won
+        hand_play.eval_insurance(dealer)
+        # this is lost (and accounts are settled)
+        hand_play.eval_hand(dealer)
+        end_cash = hand_play.player.cash
+        # insurance won compensates hand lost
+        assert end_cash == start_cash + hand_play.betsize  # it's even money
+
+    def test_insurance_full_player_blackjack_no_dealer_blackjack(
+        self, always_insuring_player: Player
+    ):
+        player = always_insuring_player
+        start_cash = player.cash  # before bet was charged
+
+        hand_play = HandPlay.from_player(player)  # bet is charged here
+        assert hand_play
+
+        dealer = Dealer(hand=Hand(Card("A", "S"), Card("9", "H")))
+
+        hand_play += Card("A", "S")
+        hand_play += Card("J", "H")
+
+        hand_play.play_insurance(dealer)  # insurance is charged here
+
+        # this is lost
+        hand_play.eval_insurance(dealer)
+        # this is won (and accounts are settled)
+        hand_play.eval_hand(dealer)
+        end_cash = hand_play.player.cash
+        # insurance won compensates hand lost
+        assert end_cash == start_cash + hand_play.betsize  # it's even money
+
+    def test_double_full_win(self):
+        class AlwaysDoubleStrategy(GameStrategy):
+            def play(self, dealer_hand: Hand, player_hand: Hand, choices: PlayDecision):
+                return PlayDecision.DOUBLE
+
+            def insurance(self, dealer_hand: Hand, player_hand: Hand) -> bool:
+                return NotImplemented
+
+        BET = 5
+        player = Player(AlwaysDoubleStrategy(), FixedBettingStrategy(BET))
+        start_cash = player.cash  # before bet was charged
+
+        hand_play = HandPlay.from_player(player)  # bet is charged here
+        assert hand_play
+
+        dealer = Dealer(hand=Hand(Card("2", "S"), Card("K", "H"), Card("K", "D")))
+
+        hand_play += Card("Q", "S")
+        hand_play += Card("J", "H")
+
+        hand_play.play(dealer)
+
+        hand_play.eval_hand(dealer)
+        end_cash = hand_play.player.cash
+        assert end_cash == start_cash + BET * 2  # double bet won
+
+    def test_double_full_loss(self):
+        class AlwaysDoubleStrategy(GameStrategy):
+            def play(self, dealer_hand: Hand, player_hand: Hand, choices: PlayDecision):
+                return PlayDecision.DOUBLE
+
+            def insurance(self, dealer_hand: Hand, player_hand: Hand) -> bool:
+                return NotImplemented
+
+        BET = 5
+        player = Player(AlwaysDoubleStrategy(), FixedBettingStrategy(BET))
+        start_cash = player.cash  # before bet was charged
+
+        hand_play = HandPlay.from_player(player)  # bet is charged here
+        assert hand_play
+
+        dealer = Dealer(hand=Hand(Card("K", "H"), Card("K", "D")))
+
+        hand_play += Card("Q", "S")
+        hand_play += Card("8", "H")
+
+        hand_play.play(dealer)
+
+        hand_play.eval_hand(dealer)
+        end_cash = hand_play.player.cash
+        assert end_cash == start_cash - BET * 2  # double bet lost
