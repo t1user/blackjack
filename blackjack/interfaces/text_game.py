@@ -120,13 +120,15 @@ class TextBettingStrategy(BettingStrategy):
         while True:
             i = (
                 input(
-                    f"BET ({TABLE_LIMITS[0]}-{TABLE_LIMITS[1]}) or [Enter] for: "
-                    f"{self.betsize} -> "
+                    f'"Q" to quit; Enter BET ({TABLE_LIMITS[0]}-{TABLE_LIMITS[1]})'
+                    f" or [Enter] for: {self.betsize} -> "
                 )
                 .upper()
                 .strip()
                 or self.betsize
             )
+            if i == "Q":
+                sys.exit()
             try:
                 i = float(i)
             except ValueError:
