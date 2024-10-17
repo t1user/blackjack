@@ -304,6 +304,10 @@ class TestHandPlay:
         hand_play += Card("9", "H")
         assert hand_play.allowed_choices.value == 29  # type: ignore
 
+    def test_no_options_if_done(self, hand_play: HandPlay):
+        hand_play.done()
+        assert hand_play.allowed_choices is None
+
     # Return value is None if the hand is done or HandPlay/multiple HandPlays otherwise
     def test_hit(self, hand_play: HandPlay, dealer: Dealer):
         hand_play += Card("A", "S")
@@ -566,3 +570,51 @@ class TestHandPlay:
         hand_play.eval_hand(dealer)
         end_cash = hand_play.player.cash
         assert end_cash == start_cash - BET * 2  # double bet lost
+
+    def test_cannot_split_if_done(self, hand_play: HandPlay):
+        hand_play.done()
+        assert not hand_play.can_split()
+
+    def test_cannot_double_if_done(self, hand_play: HandPlay):
+        hand_play.done()
+        assert not hand_play.can_double()
+
+    def test_cannot_hit_if_done(self, hand_play: HandPlay):
+        hand_play.done()
+        assert not hand_play.can_hit()
+
+    def test_cannot_surrender_if_done(self, hand_play: HandPlay):
+        hand_play.done()
+        assert not hand_play.can_surrender()
+
+    def test_cannot_stand_if_done(self, hand_play: HandPlay):
+        hand_play.done()
+        assert not hand_play.can_stand()
+
+    def test_can_split_two_cards_same_rank(self, hand_play: HandPlay):
+        hand_play += Card("8", "S")
+        hand_play += Card("8", "H")
+        assert hand_play.can_split()
+
+    def test_cannot_split_two_cards_different_ranks(self, hand_play: HandPlay):
+        hand_play += Card("8", "S")
+        hand_play += Card("9", "H")
+        assert not hand_play.can_split()
+
+    def test_cannot_split_three_cards(self, hand_play: HandPlay):
+        hand_play += Card("8", "S")
+        hand_play += Card("9", "H")
+        hand_play += Card("10", "S")
+        assert not hand_play.can_split()
+
+    def test_cannot_double_three_cards(self, hand_play: HandPlay):
+        hand_play += Card("8", "S")
+        hand_play += Card("9", "H")
+        hand_play += Card("10", "S")
+        assert not hand_play.can_double()
+
+    def test_cannot_surrender_three_cards(self, hand_play: HandPlay):
+        hand_play += Card("8", "S")
+        hand_play += Card("9", "H")
+        hand_play += Card("10", "S")
+        assert not hand_play.can_surrender()
