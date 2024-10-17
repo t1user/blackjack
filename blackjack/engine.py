@@ -395,16 +395,15 @@ class HandPlay:
     @staticmethod
     def check_if_done_first(func: Callable[..., T]) -> Callable[..., T | bool]:
         """
-        Decorator, will prevent calling a function when hand is already done.
-        Can be applied to methods that don't accept arguments.
+        Decorator, will prevent calling a method when hand is already done.
         """
 
         @wraps(func)
-        def wrapper(self: HandPlay) -> T | bool:
+        def wrapper(self: HandPlay, *args: Any, **kwargs: Any) -> T | bool:
             if self.is_done:
                 return False
             else:
-                return func(self)
+                return func(self, *args, **kwargs)
 
         return wrapper
 
@@ -557,42 +556,41 @@ class HandPlay:
         self.hand.append(card)
         return self
 
+    @check_if_done_first
     def can_surrender(self) -> bool:
         # override to enter surrender conditions
         if not SURRENDER:
-            return False
-        if self.is_done:
             return False
         elif len(self.hand) > 2:
             return False
         else:
             return True
 
+    @check_if_done_first
     def can_double(self) -> bool:
-        if self.is_done:
-            return False
-        elif self.player.cash < self.betsize:
+        if self.player.cash < self.betsize:
             return False
         elif (not DOUBLE_ON_SPLIT) and self.splits:
             return False
         else:
             return len(self.hand) == 2
 
+    @check_if_done_first
     def can_split(self) -> bool:
-        if self.is_done:
-            return False
-        elif self.player.cash < self.betsize:
+        if self.player.cash < self.betsize:
             return False
         elif (MAX_SPLITS > 0) and (self.splits > MAX_SPLITS):
             return False
         else:
             return self.hand.can_split()
 
+    @check_if_done_first
     def can_hit(self) -> bool:
-        return not self.is_done
+        return True
 
+    @check_if_done_first
     def can_stand(self) -> bool:
-        return not self.is_done
+        return True
 
     @classmethod
     def _split(
