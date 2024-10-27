@@ -153,6 +153,7 @@ class TextGame(Game):
         print(f"Dealer: {self.result_string(self.dealer.hand)} ")
         print(">>>> ", end=" ")
         print("Table: ", end=" ")
+        assert round is not None
         for hp in round.table.hands:
             print(self.result_string(hp.hand), end=" ")
             print(self.translate_result(hp.result), end=" ")

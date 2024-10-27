@@ -1,6 +1,6 @@
+#:kivy 1.0.9
 
-<Screen>:
-    
+<Screen>:  
     playarea: playarea
     player_screen: player_screen
     dealer_screen: dealer_screen
@@ -20,7 +20,6 @@
             id: infostrip
             orientation: 'vertical'
             size_hint_x: .1
-            #padding: [1, 5, 1, 5]
             spacing: 1
             Label:
                 id: shoe
@@ -46,68 +45,48 @@
                 text: '{:,.0f}'.format(bet_size.value)
                 font_size: '30dp'
                 size_hint_y: .05
-            Slider:
+            KivyBettingStrategy:
                 id: bet_size
                 size_hint_y: .6
                 orientation: 'vertical'
-                max: 500
-                step: 25
-                value: 50
         BoxLayout:
             id: playarea
             orientation: 'vertical'
             padding: [5, 5, 5, 5]
             spacing: '25dp'
-            CardView:
+            BoxLayout:
                 id: dealer_screen
-                pos_hint: {'x': root.pos_para_dealer}
+                pos_hint: {'x': 0.4 if len(self.children) < 6 else 0.2}
             BoxLayout:
                 id: player_screen
                 size_hint_x: None
-                pos_hint: {'x': root.pos_para}
-                spacing: root.hand_spacing
+                # left margin
+                pos_hint: {'x': max(0.4 - len(root.playerhands) / 10, 0)}
+                # space between hands
+                #spacing: max(150 - max(len(root.playerhands) - 3, 0) * 65, 15)
     BoxLayout:
         id: buttonstrip
         size_hint_y: .1
         padding: [5, 5, 5, 5]
+        DealButton
 
-<PlayActionButtons>:
+<KivyGameStrategy>:
     spacing: '10dp'
-    Button:
-        id: stand_button
-        text: 'Stand'
-        disabled: not root.active_options[0]
-        on_release: root.stand()
-    Button:
-        text: 'Split'
-        disabled: not root.active_options[1]
-        on_release: root.split()
-    Button:
-        text: 'Double'
-        disabled: not root.active_options[2]
-        on_release: root.double()
-    Button:
-        text: 'Hit'
-        disabled: not root.active_options[3]
-        on_release: root.hit()
+    
 
-<PostEvaluationButtons>:
+<DealButton>:
     spacing: '40dp'
     padding: [20, 1, 20, 1]
-    #Button:
-        #size_hint_x: .3
-        #text: 'Start Over'
-        #on_press: root.start_over()
     Button:
         size_hint_x: .7
         text: 'Deal'
-        on_release: root.deal()
+        on_release: app.screen.play()
 
 <InsuranceButtons>:
     spacing: '40dp'
     padding: [40, 1, 40, 1]
     Label:
-        text: 'Buy Insurance?'
+        text: 'INSURANCE?'
         size_hint_x: .5
     Button:
         size_hint_x: .25
@@ -118,15 +97,22 @@
         text: 'No'
         on_release: root.no()
 
-<CardView>:
+<PlayerCardView>:
     size_hint_x: None
     padding: [2, 2, 2, 2]
+
+<DealerCardView>:
+    size_hint_x: None
+    padding: [2, 2, 2, 2]
+
 
 <PointsLabel>:
     size_hint: None, None
     font_size: '25dp'
     padding: [5, 5]
     pos_hint: {'center_y': .5}
+
+<KivyBettingStrategy>:
     
 <WelcomeScreen>:
     title: 'Welcome!'
