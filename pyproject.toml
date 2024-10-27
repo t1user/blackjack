@@ -42,9 +42,5 @@ version_file = "blackjack/_version.py"
 [tool.isort]
 profile = "black"
 
-#[tool.mypy]
-#mypy_path = "$MYPY_CONFIG_FILE_DIR/stubs"
-# check_untyped_defs = true
-
 [tool.pytest.ini_options]
 addopts = ["-p", "no:warnings"]
