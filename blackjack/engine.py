@@ -6,7 +6,17 @@ from dataclasses import dataclass, field
 from enum import Enum, Flag, auto
 from functools import cached_property, partial, reduce, wraps
 from operator import ior
-from typing import Any, Callable, ClassVar, Generator, Literal, Self, TypeVar
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Generator,
+    Iterable,
+    Literal,
+    NamedTuple,
+    Self,
+    TypeVar,
+)
 
 # ### Rules ###
 MAX_SPLITS = -1  # negative number means no limit
@@ -382,6 +392,7 @@ class HandPlay:
     _is_done: bool = field(default=False, repr=False)
     _winnings: float = field(default=0, repr=False)
     _losses: float = field(default=0, repr=False)
+    _is_cashed: bool = field(default=False, repr=True)
 
     def __post_init__(self):
         self._losses = -self.betsize
@@ -441,7 +452,7 @@ class HandPlay:
 
     @property
     def result(self) -> float:
-        if self.is_done:
+        if self._is_cashed:
             return self._winnings + self._losses
         else:
             return 0
@@ -471,6 +482,7 @@ class HandPlay:
         self.credit_bet(0.5)
         self.hand = Hand()
         self.done()
+        self.cash_out(dealer)
         return State.DONE
 
     def play_insurance(self, dealer: Dealer) -> State | Callable[[bool], State]:
@@ -562,6 +574,11 @@ class HandPlay:
         self.done()
         return State.DONE
 
+    def eval_insurance(self, dealer: Dealer) -> State:
+        if self.insurance and dealer.hand.is_blackjack():
+            self.credit(self.insurance * 3)
+        return State.DONE
+
     def eval_hand(self, dealer: Dealer) -> State:
         dealer_hand = dealer.hand
         if self.hand > dealer_hand:
@@ -571,12 +588,12 @@ class HandPlay:
                 self.credit_bet(2)
         elif self.hand == dealer_hand:
             self.credit_bet(1)
-        self.player.credit(self._winnings)
         return State.DONE
 
-    def eval_insurance(self, dealer: Dealer) -> State:
-        if self.insurance and dealer.hand.is_blackjack():
-            self.credit(self.insurance * 3)
+    def cash_out(self, _) -> State:
+        if not self._is_cashed:
+            self.player.credit(self._winnings)
+            self._is_cashed = True
         return State.DONE
 
     def __iadd__(self, card: Card) -> Self:
@@ -588,7 +605,7 @@ class HandPlay:
         # override to enter surrender conditions
         if not SURRENDER:
             return False
-        elif len(self.hand) > 2:
+        elif len(self.hand) > 2 or self.splits:
             return False
         else:
             return True
@@ -650,6 +667,7 @@ class TablePlay:
         "play",
         "eval_hand",
         "eval_insurance",
+        "cash_out",
     )
     choices: PlayDecision | None = None
 
@@ -661,7 +679,7 @@ class TablePlay:
             self._in_progress = self._hands.pop()
             return self._in_progress
         except IndexError:
-            self._hands = self._done
+            self._hands = list(reversed(self._done))
             self._done = []
             raise StopIteration
 
@@ -705,7 +723,7 @@ class TablePlay:
         if self._in_progress is None:
             return [*self._hands, *self._done]
         else:
-            return [*self._hands, self._in_progress, *self._done]
+            return [*self._hands, self._in_progress, *reversed(self._done)]
 
     def deal_card(self, dealer: Dealer):
         for hand in self.hands:
@@ -729,6 +747,58 @@ class InsuranceDecisionCallable(DecisionCallable):
 
 class PlayDecisionCallable(DecisionCallable):
     pass
+
+
+class DecisionTuple(NamedTuple):
+    callable: Callable
+    options: Iterable
+
+
+class DecisionHandler:
+
+    def __init__(
+        self,
+        gen: Generator,
+        next_step: Callable,
+        decision_tuple: DecisionTuple,
+    ):
+        self.gen = gen
+        self.next_step = next_step
+        self.decision_function, self.choices = decision_tuple
+        self.decision_callable = None
+
+        self.make_callable()
+
+    @classmethod
+    def from_gen(cls, gen: Generator, next_step: Callable) -> Self | None:
+        try:
+            decision_tuple = next(gen)
+        except StopIteration:
+            return
+        else:
+            return cls(gen, next_step, decision_tuple)
+
+    def __call__(self, decision):
+        assert self.decision_callable is not None
+        self.decision_callable(decision)
+
+    def make_callable(self):
+
+        def inner(decision: PlayDecision | bool):
+            self.decision_callable = None
+            self.choices = None
+            try:
+                next_decision_tuple = self.gen.send(self.decision_function(decision))
+            except StopIteration:
+                self.next_step()
+            else:
+                self.decision_function, self.choices = next_decision_tuple
+                self.make_callable()
+
+        self.decision_callable = inner
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__qualname__}({self.gen})"
 
 
 @dataclass
@@ -828,19 +898,11 @@ class Round:
 
     def eval_hands(self) -> Self | None:
         ev = self.table.eval_hand(self.dealer)
-        return self.process_decision(ev, lambda: self)
+        return self.process_decision(ev, self.cash_out)
 
-    @property
-    def pipe(self) -> list[Callable]:
-        return [
-            self.shuffle,
-            self.deal,
-            self.offer_insurance,
-            self.player_play,
-            self.dealer_play,
-            self.eval_insurance,
-            self.eval_hands,
-        ]
+    def cash_out(self) -> Self | None:
+        self.table.eval_hand(self.dealer)
+        return self
 
     def play(self) -> Self | None:
         return self.shuffle()

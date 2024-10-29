@@ -11,6 +11,7 @@ from blackjack.engine import (
     PlayDecision,
     Player,
     Shoe,
+    State,
 )
 from blackjack.strategies import FixedBettingStrategy, RandomStrategy
 
@@ -328,7 +329,7 @@ class TestHandPlay:
         assert cards[0] in hand_play.hand
         assert cards[1] in hand_play.hand
         assert hand_play.is_done
-        assert return_value is None
+        assert return_value is State.DONE
 
     def test_surrender_is_done(self, hand_play: HandPlay, dealer: Dealer):
         hand_play += Card("A", "S")
@@ -352,7 +353,7 @@ class TestHandPlay:
         assert cards[0] in hand_play.hand
         assert cards[1] in hand_play.hand
         assert hand_play.is_done
-        assert return_value is None
+        assert return_value is State.DONE
 
     def test_double_charges_player(self, hand_play: HandPlay, dealer: Dealer):
         hand_play += Card("A", "S")
@@ -439,6 +440,7 @@ class TestHandPlay:
         # this is lost, but it actually settles accounts with player
         # i.e. credits insurance won
         hand_play.eval_hand(dealer)
+        hand_play.cash_out(dealer)
         # we haven't charged anything in this mock situation
         # full test with charging below
         end_cash = hand_play.player.cash
@@ -469,6 +471,7 @@ class TestHandPlay:
         hand_play.eval_insurance(dealer)
         # this is lost (and accounts are settled)
         hand_play.eval_hand(dealer)
+        hand_play.cash_out(dealer)
         end_cash = player.cash
         # insurance won compensates hand lost
         assert end_cash == start_cash
@@ -491,6 +494,7 @@ class TestHandPlay:
         hand_play.eval_insurance(dealer)
         # this is lost (and accounts are settled)
         hand_play.eval_hand(dealer)
+        hand_play.cash_out(dealer)
         end_cash = hand_play.player.cash
         # insurance won compensates hand lost
         assert end_cash == start_cash + hand_play.betsize  # it's even money
@@ -515,6 +519,7 @@ class TestHandPlay:
         hand_play.eval_insurance(dealer)
         # this is won (and accounts are settled)
         hand_play.eval_hand(dealer)
+        hand_play.cash_out(dealer)
         end_cash = hand_play.player.cash
         # insurance won compensates hand lost
         assert end_cash == start_cash + hand_play.betsize  # it's even money
@@ -542,6 +547,7 @@ class TestHandPlay:
         hand_play.play(dealer)
 
         hand_play.eval_hand(dealer)
+        hand_play.cash_out(dealer)
         end_cash = hand_play.player.cash
         assert end_cash == start_cash + BET * 2  # double bet won
 
@@ -586,6 +592,14 @@ class TestHandPlay:
     def test_cannot_surrender_if_done(self, hand_play: HandPlay):
         hand_play.done()
         assert not hand_play.can_surrender()
+
+    def test_cannot_surrender_after_split(self, hand_play: HandPlay):
+        dealer = Dealer(hand=Hand(Card("5", "H")))
+        hand_play += Card("8", "H")
+        hand_play += Card("8", "S")
+        split_hands = hand_play.split(dealer)
+        assert not split_hands[0].can_surrender()
+        assert not split_hands[1].can_surrender()
 
     def test_cannot_stand_if_done(self, hand_play: HandPlay):
         hand_play.done()
