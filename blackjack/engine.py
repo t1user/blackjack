@@ -73,6 +73,15 @@ class Card:
         else:
             return 11
 
+    @cached_property
+    def hilo_count(self):
+        if self.is_ace or self.value == 10:
+            return -1
+        elif self.value <= 6:
+            return 1
+        else:
+            return 0
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Card):
             return NotImplemented
@@ -99,6 +108,7 @@ class Shoe(list[Card]):
         super().__init__()
         self.decks = decks
         self._cut_card: int = 0
+        self.hilo_count = 0
         self.shuffle()
 
     @property
@@ -109,12 +119,16 @@ class Shoe(list[Card]):
             return False
 
     def shuffle(self) -> None:
+        self.clear()
+        self.hilo_count = 0
         self.extend([*DECK * self.decks])
         random.shuffle(self)
         self._cut_card = int(random.randint(*BURN_PERCENT_RANGE) * len(self) / 100)
 
     def deal(self) -> Card:
-        return self.pop()
+        card = self.pop()
+        self.hilo_count += card.hilo_count
+        return card
 
     def __str__(self) -> str:
         return "[" + ", ".join(map(str, self)) + "]"
@@ -903,9 +917,6 @@ class Round:
     def cash_out(self) -> Self | None:
         self.table.eval_hand(self.dealer)
         return self
-
-    def play(self) -> Self | None:
-        return self.shuffle()
 
 
 class NotEnoughCash(Exception):

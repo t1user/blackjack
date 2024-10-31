@@ -69,8 +69,22 @@ def test_deck_correct_number_of_cards():
     assert len(DECK) == 52
 
 
-def test_shoe_has_correct_number_of_cards():
+def test_new_shoe_has_correct_number_of_cards():
     shoe = Shoe(6)
+    assert len(shoe) == 6 * 52
+
+
+def test_shoe_has_correct_number_of_cards_after_shuffling():
+    shoe = Shoe(6)
+    shoe.shuffle()
+    assert len(shoe) == 6 * 52
+
+
+def test_shoe_has_correct_number_of_cards_after_shuffling_1():
+    shoe = Shoe(6)
+    while not shoe.will_shuffle:
+        shoe.deal()
+    shoe.shuffle()
     assert len(shoe) == 6 * 52
 
 
