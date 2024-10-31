@@ -25,6 +25,7 @@ from blackjack.engine import (
     PlayDecisionCallable,
     Player,
 )
+from blackjack.strategies import FixedBettingStrategy, RandomStrategy
 
 
 class PlayDecisionButton(Button):
@@ -92,53 +93,52 @@ class WelcomeScreen(Popup):
     pass
 
 
-class PlayerCardView(RelativeLayout):
-    cards = ListProperty()
-    x_card_offset = 35
-    y_card_offset = 6
-
-    def __init__(
-        self, hand: Hand, result: float | None = None, compact: bool = False, **kwargs
-    ):
+class NewImage(Image):
+    def __init__(self, n, **kwargs):
         super().__init__(**kwargs)
-        if compact:
-            self.compact_card_offset()
+        self.pos = (self.width * 0.2 * n, self.height * 0.2 * n)
+
+
+class PlayerCardView(BoxLayout):
+    cards = ListProperty()
+    cards_area = ObjectProperty()
+    result_strip = ObjectProperty()
+    result = ObjectProperty()
+
+    def __init__(self, hand: Hand, result: float | None = None, **kwargs):
+        super().__init__(**kwargs)
         self.result = result
         self.hand = hand
         self.cards = [*hand]
-
-    def compact_card_offset(self):
-        self.x_card_offset = 18
-        self.y_card_offset = 23
+        print(self.children)
 
     def on_cards(self, *args, **kwargs) -> None:
-        self.clear_widgets()
-        x = 0
-        y = 0
-        for card in self.cards:
-            self.add_widget(
-                Image(
-                    source=f"./cards/{card.rank.lower()}_{card.suit.lower()}.png",
-                    pos=(x, y),
-                    size_hint_x=1.1,
+        self.cards_area.clear_widgets()
+        for n, card in enumerate(self.cards):
+            self.cards_area.add_widget(
+                image := NewImage(
+                    n, source=f"./cards/{card.rank.lower()}_{card.suit.lower()}.png"
                 )
             )
-            x += self.x_card_offset
-            y += self.y_card_offset
         if len(self.cards) > 1:
-            self.add_widget(PointsLabel(text=self.points_label_str(), pos=(x + 55, 0)))
-        if self.result is not None:
-            self.add_widget(
-                Label(
-                    text=self.bust_or_blackjack(self.hand)
-                    or self.translate_result(self.result),
-                    font_size="25dp",
-                    pos_hint={"center_x": 0.5, "center_y": 0.1},
+            self.cards_area.add_widget(
+                p := PointsLabel(
+                    text=self.points_label_str(),
+                    pos=(image.right, self.height * 0.3),
                 )
             )
+            print(f"{p.x}")
+        # self.points_label.text = self.points_label_str()
+        self.result_strip.text = self.label_str()
+
+    def label_str(self) -> str:
+        if self.result is None:
+            return ""
+        else:
+            return f"{"+" if self.result > 0 else ""}{self.result}"
 
     def points_label_str(self) -> str:
-        return str(self.hand.value)
+        return self.bust_or_blackjack(self.hand) or str(self.hand.value)
 
     @staticmethod
     def bust_or_blackjack(hand: Hand) -> str | None:
@@ -157,12 +157,77 @@ class PlayerCardView(RelativeLayout):
             return "PUSH"
 
 
-class DealerCardView(PlayerCardView):
-    x_card_offset = 35
-    y_card_offset = 0
+class DealerCardView(RelativeLayout):
+    cards = ListProperty()
+
+    def __init__(
+        self, hand: Hand, result: float | None = None, compact: bool = False, **kwargs
+    ):
+        super().__init__(**kwargs)
+        # if compact:
+        #    self.compact_card_offset()
+        self.result = result
+        self.hand = hand
+        self.cards = [*hand]
+
+    def compact_card_offset(self):
+        self.x_card_offset = 18
+        self.y_card_offset = 23
+
+    def on_cards(self, *args, **kwargs) -> None:
+        self.clear_widgets()
+        x = 0
+        y = 0
+        for n, card in enumerate(self.cards):
+            self.add_widget(
+                image := Image(
+                    source=f"./cards/{card.rank.lower()}_{card.suit.lower()}.png",
+                    pos_hint={"x": n * 0.05, "y": n * 0.05},
+                )
+            )
+            x += image.width * 0.15
+            y += image.height * 0.15
+        if len(self.cards) > 1:
+            self.add_widget(
+                PointsLabel(
+                    text=self.points_label_str(),
+                    pos_hint={"x": (len(self.cards) + 1) * 0.05, "y": 0.3},
+                )
+            )
+        if self.result is not None:
+            self.add_widget(
+                Label(
+                    # text=self.bust_or_blackjack(self.hand)
+                    # or self.translate_result(self.result),
+                    text=self.label_str(),
+                    font_size="25dp",
+                    pos_hint={"center_x": 0.5, "center_y": 0.1},
+                    color=(0, 0, 0) if self.result < 0 else (0, 1, 0),
+                )
+            )
+
+    def label_str(self) -> str:
+        assert self.result is not None
+        return f"{"+" if self.result > 0 else ""}{self.result}"
 
     def points_label_str(self) -> str:
-        return self.bust_or_blackjack(self.hand) or super().points_label_str()
+        return self.bust_or_blackjack(self.hand) or str(self.hand.value)
+
+    @staticmethod
+    def bust_or_blackjack(hand: Hand) -> str | None:
+        if hand.is_blackjack():
+            return "BJ"
+        elif hand.is_bust():
+            return "BUST"
+
+    @staticmethod
+    def translate_result(result: float) -> str:
+        if result > 0:
+            return "WIN"
+        elif result < 0:
+            return "LOSS"
+        else:
+            return "PUSH"
 
 
 class PointsLabel(Label):
@@ -182,12 +247,7 @@ class Screen(BoxLayout):
     buttonstrip = ObjectProperty()
     cash_label = ObjectProperty()
     bet_size = ObjectProperty()
-    result_message = StringProperty()
     shoe = ObjectProperty()
-
-    pos_para = NumericProperty(0.4)
-    pos_para_dealer = NumericProperty(0.4)
-    hand_spacing = NumericProperty(100)
 
     round = ObjectProperty()
     decision_widget = ObjectProperty(allownone=True)
@@ -196,22 +256,11 @@ class Screen(BoxLayout):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
-        self.game = Game([Player(None, self.bet_size)])
-
-        # self.x_card_offset = 35
-        # self.y_card_offset = 6
-
-        self.no_cash_text = {
-            "button_text": "Close",
-            "label_text": "You don't have enough cash for this bet",
-            "title": "No Cash",
-        }
-
-        self.start_over_text = {
-            "button_text": "Play Again",
-            "label_text": "You lost all your money!!!\n\nYou make me sick you STUPID FUCK.",
-            "title": "Stupid Fuck",
-        }
+        self.game = Game(
+            [
+                Player(None, self.bet_size, number_of_hands=1),
+            ]
+        )
 
     def update(self, *args):
         self.decision_widget = self.game.round.decision_callable
@@ -253,52 +302,14 @@ class Screen(BoxLayout):
             self.player_screen.add_widget(
                 PlayerCardView(
                     hand_play.hand,
-                    result=hand_play.result if hand_play.is_done else None,
+                    result=hand_play.result if hand_play._is_cashed else None,
                 )
             )
 
     def on_dealercards(self, *args):
-        print(f"INSIDE DEALERCARDS")
+        print("INSIDE DEALERCARDS")
         self.dealer_screen.clear_widgets()
         self.dealer_screen.add_widget(DealerCardView(self.game.dealer.hand))
-
-    def no_cash_popup(self, t):
-        def action_post_dismiss(instance):
-            if c.game_over:
-                self.play_again()
-            else:
-                pass
-
-        btnclose = Button(text=t["button_text"], size_hint_y=None, height="40sp")
-        content = BoxLayout(orientation="vertical")
-        content.add_widget(
-            Label(text=t["label_text"], halign="center", font_size="20sp")
-        )
-        content.add_widget(btnclose)
-        self.popup = Popup(
-            title=t["title"],
-            content=content,
-            size_hint=(0.5, 0.5),
-            auto_dismiss=False,
-            title_align="center",
-        )
-        btnclose.bind(on_release=self.popup.dismiss)
-        self.popup.bind(on_dismiss=action_post_dismiss)
-        self.popup.open()
-
-    def play_again(self):
-        c.start_over()
-        self.start_screen()
-
-    def start_screen(self):
-        self.dealer_screen.clear_widgets()
-        self.player_screen.clear_widgets()
-        self.buttonstrip.clear_widgets()
-        self.bet_size.disabled = False
-        self.buttonstrip.add_widget(DealButton())
-        self.cash_label.text = "{:,.0f}".format(self.game.players[0].cash)
-        self.welcome = WelcomeScreen()
-        self.welcome.open()
 
 
 class BlackjackApp(App):

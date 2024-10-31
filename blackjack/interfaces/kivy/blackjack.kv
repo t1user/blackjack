@@ -12,10 +12,18 @@
     orientation: 'vertical'
     spacing: 5
     padding: [5, 5, 5, 5]
+    
+            
 
     BoxLayout:
         id: outer
         size_hint_y: .9
+        canvas.before:
+            Rectangle:
+                source: "felt.jpg"
+                pos: self.pos
+                size: self.size
+
         BoxLayout:
             id: infostrip
             orientation: 'vertical'
@@ -53,26 +61,49 @@
             id: playarea
             orientation: 'vertical'
             padding: [5, 5, 5, 5]
-            spacing: '25dp'
+            #spacing: '25dp'
             BoxLayout:
                 id: dealer_screen
-                pos_hint: {'x': 0.4 if len(self.children) < 6 else 0.2}
+                pos_hint: {"center_x": .35}
+
             BoxLayout:
                 id: player_screen
-                size_hint_x: None
-                # left margin
-                pos_hint: {'x': max(0.4 - len(root.playerhands) / 10, 0)}
-                # space between hands
-                #spacing: max(150 - max(len(root.playerhands) - 3, 0) * 65, 15)
     BoxLayout:
         id: buttonstrip
         size_hint_y: .1
         padding: [5, 5, 5, 5]
         DealButton
 
-<KivyGameStrategy>:
-    spacing: '10dp'
+<PlayerCardView>:
+    cards_area: cards_area
+    result_strip: result_strip
+
+    orientation: "vertical"
+    size_hint_y: .5
+    #size_hint_x: None
+    pos_hint: {"center_y": .5}
+    spacing: 5
+    RelativeLayout:
+        id: cards_area
+        size_hint_y: .9
+        orientation: "horizontal"
+    Label:
+        id: result_strip
+        size_hint_y: .1
+        font_size:"25dp"
+        pos_hint: {"center_x": .5}
+        padding: {5, 5, 5, 5}
+        text: self.parent.label_str()
+        #color: (0, 0, 0, 1) if self.result < 0 else (0, 1, 0, 1)
+        
+<DealerCardView>:
+    size_hint_y: .5
+    pos_hint: {"center_y": .5}
+    padding: [2, 2, 2, 2]
+    x_card_offset: self.width*1.1
+    y_card_offset: 0
     
+
 
 <DealButton>:
     spacing: '40dp'
@@ -97,20 +128,13 @@
         text: 'No'
         on_release: root.no()
 
-<PlayerCardView>:
-    size_hint_x: None
-    padding: [2, 2, 2, 2]
-
-<DealerCardView>:
-    size_hint_x: None
-    padding: [2, 2, 2, 2]
-
-
 <PointsLabel>:
-    size_hint: None, None
-    font_size: '25dp'
-    padding: [5, 5]
-    pos_hint: {'center_y': .5}
+    font_size:"25dp"
+    #halign: "left"
+    #valign: "middle"
+    #size_hint: None, None
+
+        
 
 <KivyBettingStrategy>:
     
