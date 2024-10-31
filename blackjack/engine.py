@@ -918,6 +918,52 @@ class Round:
         self.table.eval_hand(self.dealer)
         return self
 
+    @property
+    def pipe(self) -> list[Callable]:
+        return [
+            self.shuffle,
+            self.deal,
+            self.offer_insurance,
+            self.player_play,
+            self.dealer_play,
+            self.eval_insurance,
+            self.eval_hands,
+            self.cash_out,
+        ]
+
+    @staticmethod
+    def step(func):
+        def wrapper(self) -> Self | None:
+            try:
+                next_step = next(self._step)
+            except StopIteration:
+                return self
+
+            if (gen := func()) is None:
+                return next_step()
+            else:
+                if decision_callable := DecisionHandler.from_gen(gen, next_step):
+                    self.decision_callable = decision_callable
+                else:
+                    return next_step()
+
+        return wrapper
+
+    def steps(self):
+        for i in self.pipe:
+            yield i
+
+    def _play(self) -> Self | None:
+        self._step = self.steps()
+        try:
+            first_step = next(self._step)
+        except StopIteration:
+            return self
+        return first_step()
+
+    def play(self) -> Self | None:
+        return self.shuffle()
+
 
 class NotEnoughCash(Exception):
     pass
