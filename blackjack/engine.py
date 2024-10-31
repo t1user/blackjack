@@ -197,8 +197,10 @@ class Hand(list[Card]):
         )
 
     def value_str(self) -> str:
+        if len(self) < 2:
+            return ""
         if self.is_blackjack():
-            return "BLACKJACK"
+            return "BJ"
         elif self.is_bust():
             return "BUST"
         elif (
@@ -209,8 +211,12 @@ class Hand(list[Card]):
             return str(self.value)
 
     def dealer_value_str(self) -> str:
-        if self.is_blackjack():
-            return "BLACKJACK"
+        if len(self) < 2:
+            return ""
+        elif self.is_blackjack():
+            return "BJ"
+        elif self.is_bust():
+            return "BUST"
         else:
             return str(self.value)
 
@@ -301,7 +307,7 @@ class BettingStrategy(ABC):
 class DealerStrategy:
 
     def play(self, dealer_hand: Hand, *args) -> PlayDecision:  # type: ignore
-        return PlayDecision.HIT if dealer_hand.soft_value < 17 else PlayDecision.STAND
+        return PlayDecision.HIT if dealer_hand.value < 17 else PlayDecision.STAND
 
     def __repr__(self) -> str:
         return f"{self.__class__.__qualname__}()"
@@ -897,7 +903,10 @@ class Round:
         # surrendered hand (value == 0) shouldn't be a reason to take card
         # or insurance in play:
         if any(
-            [not hand.is_bust for hand in self.table.hands if hand.hand.value != 0]
+            [
+                self._is_reason(self.dealer.hand, player_hand)
+                for player_hand in self.table.hands
+            ]
         ) or any([hand.insurance for hand in self.table.hands]):
             while (
                 self.dealer.strategy.play(self.dealer.hand)  # type: ignore
@@ -917,6 +926,25 @@ class Round:
     def cash_out(self) -> Self | None:
         self.table.eval_hand(self.dealer)
         return self
+
+    @staticmethod
+    def _is_reason(dealer_hand: Hand, player_hand: HandPlay) -> bool:
+        """
+        Check if player_hand should be a reason for the dealer to draw card.
+        False means that the outcome of this hand is already determined.
+        """
+        if player_hand.is_bust:
+            return False
+        elif player_hand.hand.value == 0:  # surrendered hand
+            return False
+        elif player_hand.hand.is_blackjack and not (
+            dealer_hand._has_ace or dealer_hand._has_face
+        ):
+            return False
+        elif player_hand.hand.is_blackjack and len(dealer_hand) > 1:
+            return False
+        else:
+            return True
 
     @property
     def pipe(self) -> list[Callable]:
