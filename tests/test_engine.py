@@ -4,6 +4,7 @@ from blackjack.engine import (
     DECK,
     Card,
     Dealer,
+    GameError,
     GameStrategy,
     Hand,
     HandPlay,
@@ -86,6 +87,12 @@ def test_shoe_has_correct_number_of_cards_after_shuffling_1():
         shoe.deal()
     shoe.shuffle()
     assert len(shoe) == 6 * 52
+
+
+def test_shoe_hi_lo_count_faces():
+    shoe = Shoe(6)
+    card = shoe.deal()
+    assert shoe.hilo_count == card.hilo_count
 
 
 def test_empty_hand_has_value_zero():
@@ -252,6 +259,74 @@ def test_two_blackjacks_equal():
     hand_1 = Hand(Card("A", "S"), Card("K", "D"))
     hand_2 = Hand(Card("A", "D"), Card("J", "S"))
     assert hand_1 == hand_2
+
+
+class TestDealer:
+
+    def test_dealer_deals_card(self):
+        dealer = Dealer()
+        hand = Hand()
+        dealer.deal(hand)
+        assert len(hand) == 1
+
+    def test_dealer_deals_self(self):
+        dealer = Dealer()
+        dealer.deal_self()
+        assert len(dealer.hand) == 1
+
+    def test_dealer_doesn_shuffle_when_not_necessary(self):
+        dealer = Dealer()
+        shoe = dealer.shoe.copy()
+        dealer.shuffle()
+        assert dealer.shoe == shoe
+
+    def test_shuffle_doesnt_leave_dealer_cards(self):
+        dealer = Dealer()
+        dealer.deal_self()
+        dealer.deal_self()
+        dealer.shuffle()
+        assert len(dealer.hand) == 0
+
+    def test_dealer_force_shuffle(self):
+        dealer = Dealer()
+        shoe = dealer.shoe.copy()
+        dealer.force_shuffle()
+        assert dealer.shoe != shoe
+
+    def test_hilo_updated_after_dealer_deals(self):
+        dealer = Dealer()
+        hand = Hand()
+        dealer.deal(hand)
+        assert dealer.shoe.hilo_count == hand[0].hilo_count
+
+    def test_hilo_updated_after_dealer_deals_self(self):
+        dealer = Dealer()
+        dealer.deal_self()
+        assert dealer.shoe.hilo_count == dealer.hand[0].hilo_count
+
+    def test_dealer_has_ace_raises_on_empty_hand(self):
+        dealer = Dealer()
+        with pytest.raises(GameError):
+            dealer.has_ace
+
+    def test_dealer_has_ace_with_ace(self):
+        dealer = Dealer()
+        dealer.hand += Card("A", "H")
+        assert dealer.has_ace
+
+    def test_dealer_has_ace_with_no_ace(self):
+        dealer = Dealer()
+        dealer.hand += Card("9", "H")
+        assert not dealer.has_ace
+
+    def test_Dealer_in_dealer_repr(self):
+        assert "Dealer" in repr(Dealer())
+
+    def test_dealer_repr_reports_card_in_hand(self):
+        dealer = Dealer()
+        card = Card("A", "H")
+        dealer.hand += card
+        assert str(card) in repr(dealer)
 
 
 class TestPlayer:

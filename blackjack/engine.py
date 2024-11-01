@@ -58,7 +58,7 @@ class Card:
         return super().__new__(cls)
 
     @cached_property
-    def value(self):
+    def value(self) -> int:
         if self.is_face:
             return 10
         elif self.is_ace:
@@ -67,14 +67,14 @@ class Card:
             return int(self.rank)
 
     @cached_property
-    def soft_value(self):
+    def soft_value(self) -> int:
         if not self.is_ace:
             return self.value
         else:
             return 11
 
     @cached_property
-    def hilo_count(self):
+    def hilo_count(self) -> int:
         if self.is_ace or self.value == 10:
             return -1
         elif self.value <= 6:
@@ -320,7 +320,7 @@ class Dealer:
     strategy: DealerStrategy = DealerStrategy()
 
     def deal(self, hand: Hand | HandPlay) -> None:
-        hand += self.shoe.pop()
+        hand += self.shoe.deal()
 
     def deal_self(self) -> None:
         self.deal(self.hand)
