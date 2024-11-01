@@ -217,7 +217,13 @@ def test_can_split_double_aces():
 
 
 def test_Hand_eq():
-    hand1 = Hand(Card("A", "D"), Card("9", "H"), Card("8", "C"))
+    hand1 = Hand(Card("A", "D"), Card("9", "H"), Card("5", "C"))
+    hand2 = Hand(Card("10", "H"), Card("5", "D"))
+    assert hand1 == hand2
+
+
+def test_Hand_not_eq():
+    hand1 = Hand(Card("A", "D"), Card("9", "H"), Card("4", "C"))
     hand2 = Hand(Card("10", "H"), Card("5", "D"))
     assert hand1 != hand2
 
@@ -232,6 +238,18 @@ def test_Hand_lt():
     hand1 = Hand(Card("A", "D"), Card("9", "H"), Card("8", "C"))
     hand2 = Hand(Card("10", "H"), Card("5", "D"))
     assert hand2 < hand1
+
+
+def test_busted_hand_smaller_than_non_busted_hand():
+    hand1 = Hand(Card("A", "D"), Card("9", "H"), Card("8", "C"), Card("10", "C"))
+    hand2 = Hand(Card("10", "H"), Card("5", "D"))
+    assert hand2 > hand1
+
+
+def test_two_busted_hands_equal():
+    hand1 = Hand(Card("A", "D"), Card("9", "H"), Card("8", "C"), Card("10", "C"))
+    hand2 = Hand(Card("10", "H"), Card("5", "D"), Card("9", "H"))
+    assert hand1 == hand2
 
 
 def test_Hand_gets_new_card():
@@ -666,17 +684,15 @@ class TestHandPlay:
         BET = 5
         player = Player(AlwaysDoubleStrategy(), FixedBettingStrategy(BET))
         start_cash = player.cash  # before bet was charged
-
         hand_play = HandPlay.from_player(player)  # bet is charged here
         assert hand_play
 
         dealer = Dealer(hand=Hand(Card("2", "S"), Card("K", "H"), Card("K", "D")))
 
-        hand_play += Card("Q", "S")
-        hand_play += Card("J", "H")
+        hand_play += Card("5", "S")
+        hand_play += Card("4", "H")
 
         hand_play.play(dealer)
-
         hand_play.eval_hand(dealer)
         hand_play.cash_out(dealer)
         end_cash = hand_play.player.cash
@@ -763,3 +779,16 @@ class TestHandPlay:
         hand_play += Card("9", "H")
         hand_play += Card("10", "S")
         assert not hand_play.can_surrender()
+
+    def test_bust_hand_loses(self, hand_play: HandPlay):
+        dealer = Dealer()
+        while dealer.hand.value < 25:
+            dealer.deal_self()
+
+        hand_play += Card("8", "S")
+        hand_play += Card("9", "H")
+        hand_play += Card("10", "S")
+
+        hand_play.eval_hand(dealer)
+        hand_play.cash_out(dealer)
+        assert hand_play.result < 0

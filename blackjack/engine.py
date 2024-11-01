@@ -227,6 +227,8 @@ class Hand(list[Card]):
             return True
         elif any((self.is_blackjack(), other.is_blackjack())):
             return False
+        elif all((self.is_bust(), other.is_bust())):
+            return True
         else:
             return self.value == other.value
 
@@ -601,7 +603,9 @@ class HandPlay:
 
     def eval_hand(self, dealer: Dealer) -> State:
         dealer_hand = dealer.hand
-        if self.hand > dealer_hand:
+        if self.hand.is_bust():
+            pass
+        elif self.hand > dealer_hand:
             if self.hand.is_blackjack():
                 self.credit_bet(2.5)
             else:
