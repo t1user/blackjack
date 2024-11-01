@@ -440,6 +440,48 @@ class TestHandPlay:
         test_hand = return_value[0]
         assert not test_hand.hand.is_blackjack()
 
+    def test_eval_dealer_wins(self, hand_play: HandPlay):
+        dealer = Dealer(hand=Hand(Card("A", "S"), Card("9", "H")))
+
+        hand_play += Card("8", "S")
+        hand_play += Card("9", "H")
+
+        # cash recorded only after original bet charged
+        start_cash = hand_play.player.cash
+        hand_play.eval_hand(dealer)
+        hand_play.cash_out(dealer)
+        end_cash = hand_play.player.cash
+        # player lost so doesn't get any cash back
+        assert end_cash == start_cash
+
+    def test_eval_player_wins(self, hand_play: HandPlay):
+        dealer = Dealer(hand=Hand(Card("8", "S"), Card("9", "H")))
+
+        hand_play += Card("A", "S")
+        hand_play += Card("9", "H")
+
+        # cash recorded only after original bet charged
+        start_cash = hand_play.player.cash
+        hand_play.eval_hand(dealer)
+        hand_play.cash_out(dealer)
+        end_cash = hand_play.player.cash
+        # player won so should cash out 2x bet
+        assert end_cash == start_cash + 2 * hand_play.betsize
+
+    def test_eval_push(self, hand_play: HandPlay):
+        dealer = Dealer(hand=Hand(Card("10", "S"), Card("K", "H")))
+
+        hand_play += Card("A", "S")
+        hand_play += Card("9", "H")
+
+        # cash recorded only after original bet charged
+        start_cash = hand_play.player.cash
+        hand_play.eval_hand(dealer)
+        hand_play.cash_out(dealer)
+        end_cash = hand_play.player.cash
+        # push so player gets back original bet
+        assert end_cash == start_cash + hand_play.betsize
+
     def test_eval_insurance(self, hand_play: HandPlay):
 
         dealer = Dealer(hand=Hand(Card("A", "S"), Card("K", "H")))
