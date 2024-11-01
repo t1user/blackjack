@@ -924,8 +924,8 @@ class Round:
         return self.process_decision(ev, self.cash_out)
 
     def cash_out(self) -> Self | None:
-        self.table.eval_hand(self.dealer)
-        return self
+        co = self.table.cash_out(self.dealer)
+        return self.process_decision(co, lambda: self)
 
     @staticmethod
     def _is_reason(dealer_hand: Hand, player_hand: HandPlay) -> bool:
