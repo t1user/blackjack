@@ -22,7 +22,7 @@ class MimickDealer(GameStrategy):
     def play(
         self, dealer_hand: Hand, player_hand: Hand, choices: PlayDecision
     ) -> PlayDecision:
-        return PlayDecision.HIT if dealer_hand.value < 17 else PlayDecision.STAND
+        return PlayDecision.HIT if player_hand.value < 18 else PlayDecision.STAND
 
     def insurance(self, dealer_hand: Hand, player_hand: Hand) -> bool:
         return random.choice((True, False))

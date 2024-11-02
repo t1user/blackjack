@@ -95,8 +95,8 @@ def test_shoe_hi_lo_count():
     assert shoe.hilo_count == card.hilo_count
 
 
-def test_shoe_emits_event_on_new_card():
-    shoe = Shoe(6)
+def test_dealerhand_emits_event_on_new_card():
+    dealer = Dealer()
 
     class Hitter:
         count = 0
@@ -105,28 +105,50 @@ def test_shoe_emits_event_on_new_card():
             self.count += 1
 
     h = Hitter()
-    shoe.newCardEvent += h.hit
+    Hand.newCardEvent += h.hit
 
-    shoe.deal()
+    dealer.deal_self()
 
     assert h.count == 1
 
 
-def test_shoe_newCardEvent_emits_card():
-    shoe = Shoe(6)
+def test_hand_instance_emits_event_on_new_card():
+
+    hand = Hand()
+
+    class Hitter:
+        count = 0
+
+        def hit(self, *args):
+            self.count += 1
+
+    h = Hitter()
+    hand.newCardEvent += h.hit
+
+    hand += Card("A", "H")
+
+    assert h.count == 1
+
+
+def test_hand_newCardEvent_emits_card_and_self():
+    hand = Hand()
 
     class Hitter:
         last_card = None
+        last_hand = None
 
-        def hit(self, card):
+        def hit(self, card, hand):
             self.last_card = card
+            self.last_hand = hand
 
     h = Hitter()
-    shoe.newCardEvent += h.hit
+    hand.newCardEvent += h.hit
 
-    shoe.deal()
+    card = Card("A", "H")
+    hand += Card("A", "H")
 
-    assert isinstance(h.last_card, Card)
+    assert h.last_card == card
+    assert h.last_hand == Hand(card)
 
 
 def test_empty_hand_has_value_zero():

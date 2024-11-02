@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 from abc import ABC, abstractmethod
+from collections import UserList
 from dataclasses import dataclass, field
 from enum import Enum, Flag, auto
 from functools import cached_property, partial, reduce, wraps
@@ -106,8 +107,6 @@ DECK = [Card(rank, suit) for rank in RANKS for suit in SUITS]
 
 class Shoe(list[Card]):
 
-    newCardEvent = PubSubDecorator()
-
     def __init__(self, decks: int):
         super().__init__()
         self.decks = decks
@@ -129,7 +128,6 @@ class Shoe(list[Card]):
         random.shuffle(self)
         self._cut_card = int(random.randint(*BURN_PERCENT_RANGE) * len(self) / 100)
 
-    @newCardEvent
     def deal(self) -> Card:
         card = self.pop()
         self.hilo_count += card.hilo_count
@@ -143,7 +141,11 @@ class Hand(list[Card]):
     """
     Container for cards with methods calculating hand value and comparing it with other
     hands.
+
+    `newCardEvent` can be used in event driven interfaces to trigger screen update.
     """
+
+    newCardEvent = PubSubDecorator()
 
     def __init__(self, *cards: Card) -> None:
         super().__init__(cards)
@@ -285,6 +287,22 @@ class Hand(list[Card]):
         return ", ".join(map(str, self))
 
     __repr__ = __str__
+
+    def __setitem__(self, index, item):
+        super().__setitem__(index, item)
+        self.newCardEvent.publish(item, self)
+
+    def insert(self, index, item):
+        super().insert(index, item)
+        self.newCardEvent.publish(item, self)
+
+    def extend(self, other):
+        super().extend(other)
+        self.newCardEvent.publish(other, self)
+
+    def append(self, item):
+        super().append(item)
+        self.newCardEvent.publish(item, self)
 
 
 class GameStrategy(ABC):
@@ -835,9 +853,6 @@ class Round:
     dealer: Dealer
     table: TablePlay
     decision_callable: DecisionCallable | None = None
-
-    def __post_init__(self):
-        self.dealer.hand = Hand()
 
     @property
     def choices(self) -> PlayDecision:
