@@ -2,119 +2,89 @@
 
 <Screen>:  
     playarea: playarea
-    player_screen: player_screen
-    dealer_screen: dealer_screen
     buttonstrip: buttonstrip
     cash_label: cash_label
     bet_size: bet_size
     shoe: shoe
+    count_button: count_button
        
     orientation: 'vertical'
     spacing: 5
     padding: [5, 5, 5, 5]
-    
-            
-
+   
     BoxLayout:
-        id: outer
-        size_hint_y: .9
+        id: infostrip
+        size_hint_y: .05
+        spacing: 5
+        padding: 1
+        Label:
+            font_size: root.width * .025
+            text: "CASH"
+            size_hint_x: .1
+        Label:
+            id: cash_label
+            font_size: root.width * .025
+            size_hint_x: .1
+        Label:
+            id: shoe
+            font_size: root.width * .025
+            size_hint_x: .3
+        CountButton:
+            id: count_button
+            text: str(self.count) if self.state=="down" else "COUNT"
+            font_size: root.width *.025
+            size_hint_x: .125       
+        Label:
+            id: placeholder
+            size_hint_x: .275
+        Button:
+            text: "RESTART"
+            size_hint_x: .15
+            font_size: root.width * .025
+            background_normal:''
+            background_color: 1, 0, 0
+        Button:
+            size_hint_x: .05
+            Image: 
+                source: "hamburger_icon_white.png"
+                center_x: self.parent.center_x
+                center_y: self.parent.center_y
+    PlayArea:
+        id: playarea
+        size_hint_y: .8
         canvas.before:
             Rectangle:
                 source: "felt.jpg"
                 pos: self.pos
                 size: self.size
-
-        BoxLayout:
-            id: infostrip
-            orientation: 'vertical'
-            size_hint_x: .1
-            spacing: 1
-            Label:
-                id: shoe
-                halign: 'center'
-                size_hint_y: .2
-            Label:
-                text: 'CASH:'
-                text_size: self.size
-                valign: 'bottom'
-                halign: 'center'
-                size_hint_y: .05
-            Label:
-                id: cash_label
-                size_hint_y: .05
-                font_size: '30dp'
-            Label:
-                text: 'BET SIZE:'
-                text_size: self.size
-                valign: 'bottom'
-                halign: 'center'
-                size_hint_y: .05
-            Label:
-                text: '{:,.0f}'.format(bet_size.value)
-                font_size: '30dp'
-                size_hint_y: .05
-            KivyBettingStrategy:
-                id: bet_size
-                size_hint_y: .6
-                orientation: 'vertical'
-        BoxLayout:
-            id: playarea
-            orientation: 'vertical'
-            padding: [5, 5, 5, 5]
-            #spacing: '25dp'
-            BoxLayout:
-                id: dealer_screen
-                pos_hint: {"center_x": .35}
-
-            BoxLayout:
-                id: player_screen
+        on_size: self.update()
     BoxLayout:
-        id: buttonstrip
+        id: bottom
         size_hint_y: .1
-        padding: [5, 5, 5, 5]
-        DealButton
-
-<PlayerCardView>:
-    cards_area: cards_area
-    result_strip: result_strip
-
-    orientation: "vertical"
-    size_hint_y: .5
-    #size_hint_x: None
-    pos_hint: {"center_y": .5}
-    spacing: 5
-    RelativeLayout:
-        id: cards_area
-        size_hint_y: .9
-        orientation: "horizontal"
-    Label:
-        id: result_strip
-        size_hint_y: .1
-        font_size:"25dp"
-        pos_hint: {"center_x": .5}
-        padding: {5, 5, 5, 5}
-        text: self.parent.label_str()
-        #color: (0, 0, 0, 1) if self.result < 0 else (0, 1, 0, 1)
-        
-<DealerCardView>:
-    size_hint_y: .5
-    pos_hint: {"center_y": .5}
-    padding: [2, 2, 2, 2]
-    x_card_offset: self.width*1.1
-    y_card_offset: 0
-    
+        spacing: 5
+        KivyBettingStrategy:
+            id: bet_size
+            size_hint_x: .2
+            orientation: 'horizontal'
+        Label:
+            text: '${:,.0f}'.format(bet_size.value)
+            font_size: root.width * 0.035
+            size_hint_x: .05
+        BoxLayout:
+            id: buttonstrip
+            size_hint_x: .75
+            padding: [5, 5, 5, 5]
+            DealButton  
 
 
 <DealButton>:
-    spacing: '40dp'
-    padding: [20, 1, 20, 1]
     Button:
         size_hint_x: .7
-        text: 'Deal'
+        text: 'DEAL'
         on_release: app.screen.play()
 
 <InsuranceButtons>:
-    spacing: '40dp'
+    spacing: root.width * 0.05
     padding: [40, 1, 40, 1]
     Label:
         text: 'INSURANCE?'
@@ -126,28 +96,9 @@
     Button:
         size_hint_x: .25
         text: 'No'
-        on_release: root.no()
-
-<PointsLabel>:
-    font_size:"25dp"
-    #halign: "left"
-    #valign: "middle"
-    #size_hint: None, None
-
-        
+        on_release: root.no()  
 
 <KivyBettingStrategy>:
-    
-<WelcomeScreen>:
-    title: 'Welcome!'
-    title_align: 'center'
-    size_hint: .75, .75
-    Label:
-        text: '[size=30]Welcome to\n\n[/size][size=75]BlackJack\n[/size]Set bet size with the slider on the left\nPush \'Deal\' to begin.'
-        markup: True
-        halign: 'center'
-
-
     
 
 

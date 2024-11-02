@@ -1,31 +1,43 @@
+import math
 from typing import Any, Callable
 
 from kivy.app import App
 from kivy.clock import Clock
-from kivy.properties import (
-    ListProperty,
-    NumericProperty,
-    ObjectProperty,
-    StringProperty,
-)
+from kivy.core.window import Window
+from kivy.graphics import Color, Line
+from kivy.properties import NumericProperty, ObjectProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.image import Image
 from kivy.uix.label import Label
-from kivy.uix.popup import Popup
-from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.slider import Slider
+from kivy.uix.togglebutton import ToggleButton
+from kivy.uix.widget import Widget
 
 from blackjack import engine
 from blackjack.engine import (
     Game,
     Hand,
+    HandPlay,
     InsuranceDecisionCallable,
     PlayDecision,
     PlayDecisionCallable,
     Player,
 )
-from blackjack.strategies import FixedBettingStrategy, RandomStrategy
+from blackjack.strategies import FixedBettingStrategy, MimickDealer, RandomStrategy
+
+SIZE_RATIO = 0.65  # percentage of play area over which cards are to be distributed
+IMAGE_HEIGHT_RATIO = 0.2  # image height as proportion of window height
+
+
+class CountButton(ToggleButton):
+    count = NumericProperty(0.0)
+
+    def on_count(self, *args):
+        self.text = self.get_text()
+
+    def get_text(self, *args) -> str:
+        return str(self.count) if self.state == "down" else "COUNT"
 
 
 class PlayDecisionButton(Button):
@@ -38,7 +50,6 @@ class PlayDecisionButton(Button):
 
     def on_release(self, **kwargs):
         super().on_release(**kwargs)
-        print(f"button pressed {self.text}")
         self.parent.decision = self.action
 
 
@@ -54,7 +65,6 @@ class DecisionButtons(BoxLayout):
             )
 
     def on_decision(self, widget, decision):
-        print(f"will pass decision: {decision}")
         self.callable(decision)
 
 
@@ -72,7 +82,6 @@ class InsuranceButtons(BoxLayout):
         self.decision = False
 
     def on_decision(self, _, decision):
-        print(f"Will return decision: {decision}")
         self.callable(decision)
 
 
@@ -89,194 +98,263 @@ class KivyBettingStrategy(Slider):
         return self.value
 
 
-class WelcomeScreen(Popup):
-    pass
-
-
-class NewImage(Image):
-    def __init__(self, n, **kwargs):
-        super().__init__(**kwargs)
-        self.pos = (self.width * 0.2 * n, self.height * 0.2 * n)
-
-
-class PlayerCardView(BoxLayout):
-    cards = ListProperty()
-    cards_area = ObjectProperty()
-    result_strip = ObjectProperty()
-    result = ObjectProperty()
-
-    def __init__(self, hand: Hand, result: float | None = None, **kwargs):
-        super().__init__(**kwargs)
-        self.result = result
-        self.hand = hand
-        self.cards = [*hand]
-        print(self.children)
-
-    def on_cards(self, *args, **kwargs) -> None:
-        self.cards_area.clear_widgets()
-        for n, card in enumerate(self.cards):
-            self.cards_area.add_widget(
-                image := NewImage(
-                    n, source=f"./cards/{card.rank.lower()}_{card.suit.lower()}.png"
-                )
-            )
-        if len(self.cards) > 1:
-            self.cards_area.add_widget(
-                p := PointsLabel(
-                    text=self.points_label_str(),
-                    pos=(image.right, self.height * 0.3),
-                )
-            )
-            print(f"{p.x}")
-        # self.points_label.text = self.points_label_str()
-        self.result_strip.text = self.label_str()
-
-    def label_str(self) -> str:
-        if self.result is None:
-            return ""
-        else:
-            return f"{"+" if self.result > 0 else ""}{self.result}"
-
-    def points_label_str(self) -> str:
-        return self.bust_or_blackjack(self.hand) or str(self.hand.value)
-
-    @staticmethod
-    def bust_or_blackjack(hand: Hand) -> str | None:
-        if hand.is_blackjack():
-            return "BJ"
-        elif hand.is_bust():
-            return "BUST"
-
-    @staticmethod
-    def translate_result(result: float) -> str:
-        if result > 0:
-            return "WIN"
-        elif result < 0:
-            return "LOSS"
-        else:
-            return "PUSH"
-
-
-class DealerCardView(RelativeLayout):
-    cards = ListProperty()
-
-    def __init__(
-        self, hand: Hand, result: float | None = None, compact: bool = False, **kwargs
-    ):
-        super().__init__(**kwargs)
-        # if compact:
-        #    self.compact_card_offset()
-        self.result = result
-        self.hand = hand
-        self.cards = [*hand]
-
-    def compact_card_offset(self):
-        self.x_card_offset = 18
-        self.y_card_offset = 23
-
-    def on_cards(self, *args, **kwargs) -> None:
-        self.clear_widgets()
-        x = 0
-        y = 0
-        for n, card in enumerate(self.cards):
-            self.add_widget(
-                image := Image(
-                    source=f"./cards/{card.rank.lower()}_{card.suit.lower()}.png",
-                    pos_hint={"x": n * 0.05, "y": n * 0.05},
-                )
-            )
-            x += image.width * 0.15
-            y += image.height * 0.15
-        if len(self.cards) > 1:
-            self.add_widget(
-                PointsLabel(
-                    text=self.points_label_str(),
-                    pos_hint={"x": (len(self.cards) + 1) * 0.05, "y": 0.3},
-                )
-            )
-        if self.result is not None:
-            self.add_widget(
-                Label(
-                    # text=self.bust_or_blackjack(self.hand)
-                    # or self.translate_result(self.result),
-                    text=self.label_str(),
-                    font_size="25dp",
-                    pos_hint={"center_x": 0.5, "center_y": 0.1},
-                    color=(0, 0, 0) if self.result < 0 else (0, 1, 0),
-                )
-            )
-
-    def label_str(self) -> str:
-        assert self.result is not None
-        return f"{"+" if self.result > 0 else ""}{self.result}"
-
-    def points_label_str(self) -> str:
-        return self.bust_or_blackjack(self.hand) or str(self.hand.value)
-
-    @staticmethod
-    def bust_or_blackjack(hand: Hand) -> str | None:
-        if hand.is_blackjack():
-            return "BJ"
-        elif hand.is_bust():
-            return "BUST"
-
-    @staticmethod
-    def translate_result(result: float) -> str:
-        if result > 0:
-            return "WIN"
-        elif result < 0:
-            return "LOSS"
-        else:
-            return "PUSH"
-
-
-class PointsLabel(Label):
-    pass
-
-
 class DealButton(BoxLayout):
     pass
 
 
+class TextLabel(Label):
+    pass
+
+
+class HandWidget(Widget):
+
+    _offset = 0.15, 0.15
+
+    def __init__(self, pos: tuple[float, float], hand: Hand, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.center = pos
+        self.hand = hand
+        if len(self.hand) > 0:
+            self.render()
+
+    @property
+    def image_height(self):
+        return Window.height * IMAGE_HEIGHT_RATIO
+
+    @property
+    def offset(self):
+        return (
+            self._offset[0] * self.image_height,
+            self._offset[1] * self.image_height,
+        )
+
+    def render(self):
+        for i, card in enumerate(self.hand):
+            self.add_widget(
+                image := Image(
+                    source=f"cards/{card.rank.lower()}_{card.suit.lower()}.png",
+                    center=self._offset_position(i),
+                    height=self.image_height,
+                )
+            )
+        self.add_widget(
+            Label(
+                text=self.points_value_str(),
+                center=self._label_position(image, i),
+                font_size=self.image_height * 0.2,
+            )
+        )
+
+    def _offset_position(self, n):
+        return (
+            self.center[0] + self.offset[0] * n,
+            self.center[1] + self.offset[1] * n,
+        )
+
+    def _label_position(self, image: Image, n=0):
+        # return self._offset_position(n - 1)[0], image.top + 10
+        return image.center[0], image.top + image.height * 0.15
+
+    def points_value_str(self):
+        return self.hand.value_str()
+
+
+class PlayerHand(HandWidget):
+
+    _offset = 0.15, 0.15
+
+    def __init__(
+        self,
+        pos: tuple[float, float],
+        hand_play: HandPlay,
+        active: bool = False,
+        **kwargs,
+    ) -> None:
+        Widget.__init__(self, **kwargs)
+        self.center = pos
+        self.hand = hand_play.hand
+        self.hand_play = hand_play
+        if len(self.hand) > 0:
+            self.render()
+        if active:
+            with self.canvas.before:
+                Color(1, 0, 0)  # Set color to red
+                self.frame = Line(
+                    rectangle=self.get_bounding_box(), width=1
+                )  # Draw the red frame
+                self.bind(pos=self.update_frame, size=self.update_frame)
+
+    def get_bounding_box(self):
+        # Initialize with the widget's own position and size
+        min_x, min_y = self.x, self.y
+        max_x, max_y = self.right, self.top
+
+        # Iterate over children to get the true bounding box
+        for child in self.children:
+            if not isinstance(child, Image):
+                continue
+            child_min_x, child_min_y = child.to_window(*child.pos)
+            child_max_x, child_max_y = (
+                child_min_x + child.width,
+                child_min_y + child.height,
+            )
+
+            # Update min and max values to include child bounds
+            min_x, min_y = min(min_x, child_min_x), min(min_y, child_min_y)
+            max_x, max_y = max(max_x, child_max_x), max(max_y, child_max_y)
+
+        # Return bounding box coordinates
+        return (min_x, min_y * 0.9, max_x - min_x, max_y * 1.15 - min_y)
+
+    def update_frame(self, *args):
+        # Update frame to match the computed bounding box
+        bbox = self.get_bounding_box()
+        self.frame.rectangle = bbox
+
+    def render(self):
+        super().render()
+        self.add_widget(
+            Label(
+                text=self.result_str(),
+                color=(1, 0, 0) if self.hand_play.result < 0 else (0, 1, 0),
+                center=(self.center_x, self.top - self.height * 1.1),
+                font_size=self.image_height * 0.2,
+            )
+        )
+
+    def result_str(self) -> str:
+        if not self.hand_play._is_cashed:
+            return ""
+        else:
+            result = self.hand_play.result
+            if not result:
+                return "PUSH"
+            else:
+                return f"+{result}" if result > 0 else str(result)
+
+
+class DealerHand(HandWidget):
+
+    _offset = 1, 0
+
+    def _offset_position(self, n):
+        offset = self.offset[0]
+        if len(self.hand) > 4:
+            n = n - len(self.hand) + 4
+        if len(self.hand) > 5:
+            offset = self.offset[0] * 0.75
+        return (self.center[0] + offset * (n - 1), self.center[1])
+
+    def _label_position(self, image: Image, n=0) -> tuple[float, float]:
+        if len(self.hand) > 4:
+            n = n - len(self.hand) + 4
+        return self.center[0] + self.offset[0] * (n - 0.25), self.center[1]
+
+    def points_value_str(self) -> str:
+        return self.hand.dealer_value_str()
+
+
+class PlayArea(Widget):
+    playerhands: list[HandPlay] = []
+    dealercards: Hand = Hand()
+
+    def update(self, *args):
+        self.clear_widgets()
+        self.dealer_hand()
+        self.player_hands()
+
+    def player_hands(self):
+        if len(self.playerhands) == 0:
+            return
+        for position_index, hand in zip(
+            self.get_player_position_indexes(len(self.playerhands)), self.playerhands
+        ):
+            position = self.get_position(position_index)
+            hand_widget = PlayerHand(position, hand)
+            self.add_widget(hand_widget)
+
+    def get_player_position_indexes(self, n: int):
+        # n is number of hands to spread out
+        if n == 1:
+            return [0.5]
+        elif n == 2:
+            return [0.2, 0.8]
+        elif n == 3:
+            return [0.15, 0.5, 0.85]
+        elif n == 4:
+            return [0, 0.3, 0.6, 0.9]
+        elif n == 5:
+            return [0, 0.25, 0.5, 0.75, 1]
+        else:
+            return list(
+                map(
+                    lambda x: x / 1000,
+                    range(0, 1000 + (step := int(1 / n * 1000)), step),
+                )
+            )
+
+    def dealer_hand(self) -> None:
+        if self.dealercards:
+            position = self.get_position(-0.5)
+            hand_widget = DealerHand(position, self.dealercards)
+            self.add_widget(hand_widget)
+
+    def get_position(self, t):
+        """Return position coordinates on an ellipse for a position index t.
+        t must be in the range -1,1.
+        players are position in the area 0, 1
+        dealer is always at position -0.5
+        """
+        assert -1 <= t <= 1
+        height = SIZE_RATIO * self.height / 2
+        width = SIZE_RATIO * self.width / 2
+        t_ = abs(t)
+        x = width - 2 * (t_ * width)
+        y = -height / width * math.sqrt(width**2 - x**2)
+        if t < 0:
+            y = -y
+        return self.offset(x, y)
+
+    def offset(self, x, y):
+        return self.center[0] + x, self.center[1] + y
+
+
 class Screen(BoxLayout):
 
-    playerhands = ListProperty()
-    dealercards = ListProperty()
-    player_screen = ObjectProperty()
-    dealer_screen = ObjectProperty()
+    playarea = ObjectProperty()
     buttonstrip = ObjectProperty()
     cash_label = ObjectProperty()
     bet_size = ObjectProperty()
     shoe = ObjectProperty()
+    count_button = ObjectProperty()
 
-    round = ObjectProperty()
     decision_widget = ObjectProperty(allownone=True)
-    cards = ListProperty()
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-
         self.game = Game(
             [
-                Player(None, self.bet_size, number_of_hands=1),
+                Player(None, self.bet_size),
+                Player(MimickDealer(), FixedBettingStrategy(25)),
+                Player(RandomStrategy(), FixedBettingStrategy(50)),
             ]
         )
 
     def update(self, *args):
         self.decision_widget = self.game.round.decision_callable
-        self.dealercards = self.game.dealer.hand
-        self.playerhands = [hand_play for hand_play in self.game.round.table.hands]
-        self.cards = [card for hand_play in self.playerhands for card in hand_play.hand]
-        self.cash_label.text = "{:,.0f}".format(self.game.players[0].cash)
+        self.playarea.dealercards = self.game.dealer.hand
+        self.playarea.playerhands = list(
+            reversed([hand_play for hand_play in self.game.round.table.hands])
+        )
+        self.count_button.count = self.game.dealer.shoe.hilo_count
+        self.cash_label.text = "${:>5,.0f}".format(self.game.players[0].cash)
         shoe = self.game.dealer.shoe
         self.shoe.text = (
-            f"DECKS: {"\n"}"
+            f"DECKS: "
             f"{(len(shoe)-shoe._cut_card)/52:.1f}"
-            f"{"\n"} {"SHUFFLE" if shoe.will_shuffle else ""}"
+            f"{"SHUFFLE" if shoe.will_shuffle else ""}"
         )
-
-    def welcome(self):
-        WelcomeScreen().open()
+        self.playarea.update()
 
     def on_decision_widget(self, screen, decision):
         if isinstance(decision, InsuranceDecisionCallable):
@@ -284,32 +362,18 @@ class Screen(BoxLayout):
             self.buttonstrip.add_widget(InsuranceButtons(decision))
         elif isinstance(decision, PlayDecisionCallable):
             self.buttonstrip.clear_widgets()
-            assert self.round
-            self.buttonstrip.add_widget(DecisionButtons(self.round.choices, decision))
+            assert self.game.round
+            self.buttonstrip.add_widget(
+                DecisionButtons(self.game.round.choices, decision)
+            )
         elif decision is None:
             self.buttonstrip.clear_widgets()
             self.buttonstrip.add_widget(DealButton())
             self.bet_size.disabled = False
-            self.on_cards()
+            self.playarea.update()
 
     def play(self, *args, **kwargs):
         self.game.play()
-        self.round = self.game.round
-
-    def on_cards(self, *args):
-        self.player_screen.clear_widgets()
-        for hand_play in self.playerhands:
-            self.player_screen.add_widget(
-                PlayerCardView(
-                    hand_play.hand,
-                    result=hand_play.result if hand_play._is_cashed else None,
-                )
-            )
-
-    def on_dealercards(self, *args):
-        print("INSIDE DEALERCARDS")
-        self.dealer_screen.clear_widgets()
-        self.dealer_screen.add_widget(DealerCardView(self.game.dealer.hand))
 
 
 class BlackjackApp(App):
