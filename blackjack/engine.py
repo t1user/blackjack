@@ -18,6 +18,8 @@ from typing import (
     TypeVar,
 )
 
+from .helpers import PubSubDecorator
+
 # ### Rules ###
 MAX_SPLITS = -1  # negative number means no limit
 SINGLE_CARD_ON_SPLIT_ACES = True
@@ -104,6 +106,8 @@ DECK = [Card(rank, suit) for rank in RANKS for suit in SUITS]
 
 class Shoe(list[Card]):
 
+    newCardEvent = PubSubDecorator()
+
     def __init__(self, decks: int):
         super().__init__()
         self.decks = decks
@@ -125,6 +129,7 @@ class Shoe(list[Card]):
         random.shuffle(self)
         self._cut_card = int(random.randint(*BURN_PERCENT_RANGE) * len(self) / 100)
 
+    @newCardEvent
     def deal(self) -> Card:
         card = self.pop()
         self.hilo_count += card.hilo_count
@@ -831,6 +836,9 @@ class Round:
     table: TablePlay
     decision_callable: DecisionCallable | None = None
 
+    def __post_init__(self):
+        self.dealer.hand = Hand()
+
     @property
     def choices(self) -> PlayDecision:
         try:
@@ -1033,7 +1041,9 @@ class Game:
                 hand_play = HandPlay.from_player(player)
                 if hand_play is not None:
                     hand_plays.append(hand_play)
-        return Round(self.dealer, TablePlay(hand_plays))
+        r = Round(self.dealer, TablePlay(hand_plays))
+        print(f"made new round: {r} {id(r)}")
+        return r
 
     def play(self) -> Round | None:
         self.round = self.make_round()

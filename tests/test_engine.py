@@ -89,10 +89,44 @@ def test_shoe_has_correct_number_of_cards_after_shuffling_1():
     assert len(shoe) == 6 * 52
 
 
-def test_shoe_hi_lo_count_faces():
+def test_shoe_hi_lo_count():
     shoe = Shoe(6)
     card = shoe.deal()
     assert shoe.hilo_count == card.hilo_count
+
+
+def test_shoe_emits_event_on_new_card():
+    shoe = Shoe(6)
+
+    class Hitter:
+        count = 0
+
+        def hit(self, *args):
+            self.count += 1
+
+    h = Hitter()
+    shoe.newCardEvent += h.hit
+
+    shoe.deal()
+
+    assert h.count == 1
+
+
+def test_shoe_newCardEvent_emits_card():
+    shoe = Shoe(6)
+
+    class Hitter:
+        last_card = None
+
+        def hit(self, card):
+            self.last_card = card
+
+    h = Hitter()
+    shoe.newCardEvent += h.hit
+
+    shoe.deal()
+
+    assert isinstance(h.last_card, Card)
 
 
 def test_empty_hand_has_value_zero():
