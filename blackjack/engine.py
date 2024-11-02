@@ -525,9 +525,9 @@ class HandPlay:
 
     def surrender(self, dealer: Dealer) -> State:
         self.credit_bet(0.5)
-        self.hand = Hand()
-        self.done()
+        # self.hand = Hand()
         self.cash_out(dealer)
+        self.done()
         return State.DONE
 
     def play_insurance(self, dealer: Dealer) -> State | Callable[[bool], State]:
@@ -626,7 +626,7 @@ class HandPlay:
 
     def eval_hand(self, dealer: Dealer) -> State:
         dealer_hand = dealer.hand
-        if self.hand.is_bust():
+        if self.hand.is_bust() or self._is_cashed:
             pass
         elif self.hand > dealer_hand:
             if self.hand.is_blackjack():
