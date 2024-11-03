@@ -23,6 +23,7 @@ from blackjack.engine import (
     PlayDecision,
     PlayDecisionCallable,
     Player,
+    Round,
 )
 from blackjack.strategies import FixedBettingStrategy, MimickDealer, RandomStrategy
 
@@ -87,6 +88,8 @@ class InsuranceButtons(BoxLayout):
 
 class KivyBettingStrategy(Slider):
 
+    max_bet = NumericProperty(engine.PLAYER_CASH)
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.min = engine.TABLE_LIMITS[0]
@@ -96,6 +99,9 @@ class KivyBettingStrategy(Slider):
     def bet(self, *args: Any, **kwargs: Any) -> float:
         self.disabled = True
         return self.value
+
+    def on_max_bet(self, *args):
+        self.max = min(engine.TABLE_LIMITS[1], self.max_bet)
 
 
 class DealButton(BoxLayout):
@@ -334,11 +340,15 @@ class Screen(BoxLayout):
         super().__init__(**kwargs)
         self.game = Game(
             [
-                Player(None, self.bet_size),
+                Player(None, self.bet_size, cash=50),
                 Player(MimickDealer(), FixedBettingStrategy(25)),
                 Player(RandomStrategy(), FixedBettingStrategy(50)),
             ]
         )
+        Hand.newCardEvent += self.update
+        Round.newDecisionEvent += self.update
+        Round.cashOutEvent += self.update
+        self.update()
 
     def update(self, *args):
         self.decision_widget = self.game.round.decision_callable
@@ -347,13 +357,14 @@ class Screen(BoxLayout):
             reversed([hand_play for hand_play in self.game.round.table.hands])
         )
         self.count_button.count = self.game.dealer.shoe.hilo_count
-        self.cash_label.text = "${:>5,.0f}".format(self.game.players[0].cash)
+        self.cash_label.text = "${:>5,.2f}".format(self.game.players[0].cash)
         shoe = self.game.dealer.shoe
         self.shoe.text = (
             f"DECKS: "
             f"{(len(shoe)-shoe._cut_card)/52:.1f}"
             f"{"SHUFFLE" if shoe.will_shuffle else ""}"
         )
+        self.bet_size.max_bet = self.game.players[0].cash
         self.playarea.update()
 
     def on_decision_widget(self, screen, decision):
@@ -370,7 +381,7 @@ class Screen(BoxLayout):
             self.buttonstrip.clear_widgets()
             self.buttonstrip.add_widget(DealButton())
             self.bet_size.disabled = False
-            self.playarea.update()
+            # self.playarea.update()
 
     def play(self, *args, **kwargs):
         self.game.play()
@@ -380,7 +391,7 @@ class BlackjackApp(App):
 
     def build(self):
         self.screen = Screen()
-        Clock.schedule_interval(self.screen.update, 0.25)
+        # Clock.schedule_interval(self.screen.update, 0.25)
         return self.screen
 
 

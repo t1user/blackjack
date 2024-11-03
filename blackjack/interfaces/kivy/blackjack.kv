@@ -31,7 +31,7 @@
             size_hint_x: .3
         CountButton:
             id: count_button
-            text: str(self.count) if self.state=="down" else "COUNT"
+            text: f"{'+' if self.count > 0 else ''}{self.count}" if self.state=="down" else "COUNT"
             font_size: root.width *.025
             size_hint_x: .125       
         Label:
