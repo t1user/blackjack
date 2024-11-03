@@ -777,8 +777,65 @@ class TestHandPlay:
         hand_play.play(dealer)
 
         hand_play.eval_hand(dealer)
+        hand_play.cash_out(dealer)
         end_cash = hand_play.player.cash
         assert end_cash == start_cash - BET * 2  # double bet lost
+
+    def test_split_full_loss(self):
+        class AlwaysSplitStrategy(GameStrategy):
+            def play(self, dealer_hand: Hand, player_hand: Hand, choices: PlayDecision):
+                return PlayDecision.SPLIT
+
+            def insurance(self, dealer_hand: Hand, player_hand: Hand) -> bool:
+                return NotImplemented
+
+        BET = 5
+        player = Player(AlwaysSplitStrategy(), FixedBettingStrategy(BET))
+        start_cash = player.cash  # before bet was charged
+
+        hand_play = HandPlay.from_player(player)  # bet is charged here
+        assert hand_play
+
+        dealer = Dealer(hand=Hand(Card("K", "H"), Card("A", "D")))
+
+        hand_play += Card("8", "S")
+        hand_play += Card("8", "H")
+
+        hands = hand_play.play(dealer)
+        for hand in hands:  # type: ignore
+            hand.eval_hand(dealer)
+            hand.cash_out(dealer)
+        end_cash = player.cash
+        assert end_cash == start_cash - BET * 2  # double bet lost
+        assert hands[0].result == -BET  # type: ignore
+
+    def test_split_full_win(self):
+        class AlwaysSplitStrategy(GameStrategy):
+            def play(self, dealer_hand: Hand, player_hand: Hand, choices: PlayDecision):
+                return PlayDecision.SPLIT
+
+            def insurance(self, dealer_hand: Hand, player_hand: Hand) -> bool:
+                return NotImplemented
+
+        BET = 5
+        player = Player(AlwaysSplitStrategy(), FixedBettingStrategy(BET))
+        start_cash = player.cash  # before bet was charged
+
+        hand_play = HandPlay.from_player(player)  # bet is charged here
+        assert hand_play
+
+        dealer = Dealer(hand=Hand(Card("K", "H"), Card("5", "S"), Card("K", "D")))
+
+        hand_play += Card("8", "S")
+        hand_play += Card("8", "H")
+
+        hands = hand_play.play(dealer)
+        for hand in hands:  # type: ignore
+            hand.eval_hand(dealer)
+            hand.cash_out(dealer)
+        end_cash = player.cash
+        assert end_cash == start_cash + BET * 2  # double bet lost
+        assert hands[0].result == BET  # type: ignore
 
     def test_cannot_split_if_done(self, hand_play: HandPlay):
         hand_play.done()

@@ -449,7 +449,7 @@ class HandPlay:
             return cls(player, betsize)
         else:
             player.cash += betsize
-            raise NotEnoughCash
+            # raise NotEnoughCash
 
     @staticmethod
     def check_if_done_first(func: Callable[..., T]) -> Callable[..., T | bool]:
@@ -850,9 +850,20 @@ class DecisionHandler:
 
 @dataclass
 class Round:
+    newDecisionEvent: ClassVar = PubSubDecorator()
+    cashOutEvent: ClassVar = PubSubDecorator()
     dealer: Dealer
     table: TablePlay
-    decision_callable: DecisionCallable | None = None
+    _decision_callable: DecisionCallable | None = None
+
+    @property
+    def decision_callable(self):
+        return self._decision_callable
+
+    @decision_callable.setter
+    def decision_callable(self, value: DecisionCallable | None):
+        self._decision_callable = value
+        self.newDecisionEvent.publish(value)
 
     @property
     def choices(self) -> PlayDecision:
@@ -952,7 +963,9 @@ class Round:
 
     def cash_out(self) -> Self | None:
         co = self.table.cash_out(self.dealer)
-        return self.process_decision(co, lambda: self)
+        p = self.process_decision(co, lambda: self)
+        self.cashOutEvent.publish(self)
+        return p
 
     @staticmethod
     def _is_reason(dealer_hand: Hand, player_hand: HandPlay) -> bool:
