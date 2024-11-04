@@ -357,6 +357,35 @@ class Dealer:
     def force_shuffle(self) -> None:
         self.shoe.shuffle()
 
+    def play(self, hands: list[HandPlay]):
+        # dealer takes card if there is at least one non-busted hand
+        # surrendered hand (value == 0) shouldn't be a reason to take card
+        # or insurance in play:
+        if any(
+            [self._is_reason(self.hand, player_hand) for player_hand in hands]
+        ) or any([hand.insurance for hand in hands]):
+            while self.strategy.play(self.hand) is PlayDecision.HIT:
+                self.deal_self()
+
+    @staticmethod
+    def _is_reason(dealer_hand: Hand, player_hand: HandPlay) -> bool:
+        """
+        Check if player_hand should be a reason for the dealer to draw card.
+        False means that the outcome of this hand is already determined.
+        """
+        if player_hand.is_bust:
+            return False
+        elif player_hand.hand.value == 0:  # surrendered hand
+            return False
+        elif player_hand.hand.is_blackjack and not (
+            dealer_hand._has_ace or dealer_hand._has_face
+        ):
+            return False
+        elif player_hand.hand.is_blackjack and len(dealer_hand) > 1:
+            return False
+        else:
+            return True
+
     @property
     def has_ace(self):
         if len(self.hand) != 1:
@@ -950,20 +979,7 @@ class Round:
         return self.process_decision(play_results, self.dealer_play)
 
     def dealer_play(self) -> Self | None:
-        # dealer takes card if there is at least one non-busted hand
-        # surrendered hand (value == 0) shouldn't be a reason to take card
-        # or insurance in play:
-        if any(
-            [
-                self._is_reason(self.dealer.hand, player_hand)
-                for player_hand in self.table.hands
-            ]
-        ) or any([hand.insurance for hand in self.table.hands]):
-            while (
-                self.dealer.strategy.play(self.dealer.hand)  # type: ignore
-                is PlayDecision.HIT
-            ):
-                self.dealer.deal_self()
+        self.dealer.play(self.table.hands)
         return self.eval_insurance()
 
     def eval_insurance(self) -> Self | None:
@@ -979,25 +995,6 @@ class Round:
         p = self.process_decision(co, lambda: self)
         self.cashOutEvent.publish(self)
         return p
-
-    @staticmethod
-    def _is_reason(dealer_hand: Hand, player_hand: HandPlay) -> bool:
-        """
-        Check if player_hand should be a reason for the dealer to draw card.
-        False means that the outcome of this hand is already determined.
-        """
-        if player_hand.is_bust:
-            return False
-        elif player_hand.hand.value == 0:  # surrendered hand
-            return False
-        elif player_hand.hand.is_blackjack and not (
-            dealer_hand._has_ace or dealer_hand._has_face
-        ):
-            return False
-        elif player_hand.hand.is_blackjack and len(dealer_hand) > 1:
-            return False
-        else:
-            return True
 
     @property
     def pipe(self) -> list[Callable]:
