@@ -43,6 +43,7 @@
             font_size: root.width * .025
             background_normal:''
             background_color: 1, 0, 0
+            on_release: root.start()
         Button:
             size_hint_x: .05
             Image: 
@@ -101,7 +102,13 @@
 <KivyBettingStrategy>:
     
 
-
+<WelcomeScreen>:
+    title: 'Welcome!'
+    title_align: 'center'
+    size_hint: .5, .5
+    #pos_hint: {"x":.2, "top": .9}
+    Label:
+        text: "BlackJack"
 
 
 

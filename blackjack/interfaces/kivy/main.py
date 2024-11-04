@@ -10,6 +10,8 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.image import Image
 from kivy.uix.label import Label
+from kivy.uix.modalview import ModalView
+from kivy.uix.popup import Popup
 from kivy.uix.slider import Slider
 from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.widget import Widget
@@ -173,13 +175,13 @@ class PlayerHand(HandWidget):
         self,
         pos: tuple[float, float],
         hand_play: HandPlay,
-        active: bool = False,
         **kwargs,
     ) -> None:
         Widget.__init__(self, **kwargs)
         self.center = pos
         self.hand = hand_play.hand
         self.hand_play = hand_play
+        active = hand_play.active
         if len(self.hand) > 0:
             self.render()
         if active:
@@ -333,25 +335,19 @@ class Screen(BoxLayout):
     bet_size = ObjectProperty()
     shoe = ObjectProperty()
     count_button = ObjectProperty()
+    welcome_screen = ObjectProperty()
 
-    decision_widget = ObjectProperty(allownone=True)
+    # decision_widget = ObjectProperty(allownone=True)
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.game = Game(
-            [
-                Player(None, self.bet_size, cash=50),
-                Player(MimickDealer(), FixedBettingStrategy(25)),
-                Player(RandomStrategy(), FixedBettingStrategy(50)),
-            ]
-        )
         Hand.newCardEvent += self.update
-        Round.newDecisionEvent += self.update
+        Round.newDecisionEvent += self.on_decision_widget
         Round.cashOutEvent += self.update
-        self.update()
+        self.game = self.start()
 
     def update(self, *args):
-        self.decision_widget = self.game.round.decision_callable
+        # self.decision_widget = self.game.round.decision_callable
         self.playarea.dealercards = self.game.dealer.hand
         self.playarea.playerhands = list(
             reversed([hand_play for hand_play in self.game.round.table.hands])
@@ -361,13 +357,13 @@ class Screen(BoxLayout):
         shoe = self.game.dealer.shoe
         self.shoe.text = (
             f"DECKS: "
-            f"{(len(shoe)-shoe._cut_card)/52:.1f}"
+            f"{(len(shoe)-shoe._cut_card)/52:.1f} "
             f"{"SHUFFLE" if shoe.will_shuffle else ""}"
         )
         self.bet_size.max_bet = self.game.players[0].cash
         self.playarea.update()
 
-    def on_decision_widget(self, screen, decision):
+    def on_decision_widget(self, decision):
         if isinstance(decision, InsuranceDecisionCallable):
             self.buttonstrip.clear_widgets()
             self.buttonstrip.add_widget(InsuranceButtons(decision))
@@ -381,10 +377,23 @@ class Screen(BoxLayout):
             self.buttonstrip.clear_widgets()
             self.buttonstrip.add_widget(DealButton())
             self.bet_size.disabled = False
-            # self.playarea.update()
+        self.playarea.update()
 
     def play(self, *args, **kwargs):
         self.game.play()
+
+    def start(self, *args) -> Game:
+        self.game = Game(
+            [
+                Player(None, self.bet_size),
+                Player(MimickDealer(), FixedBettingStrategy(25)),
+                Player(RandomStrategy(), FixedBettingStrategy(50)),
+            ]
+        )
+        self.on_decision_widget(None)
+        # self.bet_size.disabled = False
+        self.update()
+        return self.game
 
 
 class BlackjackApp(App):

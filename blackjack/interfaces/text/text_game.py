@@ -145,10 +145,11 @@ class TextGame(Game):
         print("-----------------------------------")
         print(f"Your cash: {self.players[0].cash}")
         try:
-            round = super().play()
+            super().play()
         except NotEnoughCash:
             print("You don't have enought cash, you dumb fuck!")
             sys.exit()
+        round = self.round
         print(">>>> ", end=" ")
         print(f"Dealer: {self.result_string(self.dealer.hand)} ")
         print(">>>> ", end=" ")
