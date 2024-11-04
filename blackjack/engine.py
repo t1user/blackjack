@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import random
 from abc import ABC, abstractmethod
-from collections import UserList
 from dataclasses import dataclass, field
 from enum import Enum, Flag, auto
 from functools import cached_property, partial, reduce, wraps
@@ -434,6 +433,7 @@ class HandPlay:
     hand: Hand = field(default_factory=Hand)
     insurance: float = 0
     splits: int = 0
+    active: bool = False
     _is_done: bool = field(default=False, repr=False)
     _winnings: float = field(default=0, repr=False)
     _losses: float = field(default=0, repr=False)
@@ -444,10 +444,18 @@ class HandPlay:
 
     @classmethod
     def from_player(cls, player: Player) -> Self | None:
-        betsize = min(player.bet(), TABLE_LIMITS[1])
-        if betsize >= TABLE_LIMITS[0]:
+        try:
+            betsize = player.bet()
+        except NotEnoughCash:
+            betsize = player.cash
+
+        if betsize > TABLE_LIMITS[1]:
+            return cls(player, TABLE_LIMITS[1])
+        elif betsize >= TABLE_LIMITS[0]:
             return cls(player, betsize)
         else:
+            # cash that the player has is lower than table minimum
+            # return bet that was already charged because play not possible
             player.cash += betsize
             # raise NotEnoughCash
 
@@ -746,11 +754,13 @@ class TablePlay:
 
             if callable(hand_hands_or_none):
                 self.choices = hand_play.allowed_choices
+                hand_play.active = True
                 feedback = yield hand_hands_or_none
                 if feedback is not None:
                     hand_hands_or_none = feedback
 
             if hand_hands_or_none is State.DONE:
+                hand_play.active = False
                 self._done.append(hand_play)
             elif hasattr(hand_hands_or_none, "__iter__"):
                 assert not callable(hand_hands_or_none)
@@ -919,10 +929,13 @@ class Round:
         return self.deal()
 
     def deal(self) -> Self | None:
-        self.table.deal_card(self.dealer)
-        self.dealer.deal_self()
-        self.table.deal_card(self.dealer)
-        return self.offer_insurance()
+        if self.table.hands:
+            self.table.deal_card(self.dealer)
+            self.dealer.deal_self()
+            self.table.deal_card(self.dealer)
+            return self.offer_insurance()
+        else:
+            return self  # need to break out of the gen and stop playing
 
     def offer_insurance(self) -> Self | None:
         if self.dealer.has_ace:
