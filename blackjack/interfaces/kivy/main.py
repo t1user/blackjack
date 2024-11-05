@@ -1,4 +1,5 @@
 import math
+from importlib.util import source_from_cache
 from typing import Any, Callable
 
 from kivy.app import App
@@ -114,6 +115,10 @@ class TextLabel(Label):
     pass
 
 
+class RotatedImage(Image):
+    angle = NumericProperty(90)
+
+
 class HandWidget(Widget):
 
     _offset = 0.15, 0.15
@@ -220,7 +225,33 @@ class PlayerHand(HandWidget):
         self.frame.rectangle = bbox
 
     def render(self):
-        super().render()
+        if not self.hand_play.doubled:
+            super().render()
+        else:
+            new_hand = self.hand.copy()
+            last_card = new_hand.pop()
+            for i, card in enumerate(new_hand):
+                self.add_widget(
+                    image := Image(
+                        source=f"cards/{card.rank.lower()}_{card.suit.lower()}.png",
+                        center=self._offset_position(i),
+                        height=self.image_height,
+                    )
+                )
+            self.add_widget(
+                image := RotatedImage(
+                    source=f"cards/{last_card.rank.lower()}_{last_card.suit.lower()}.png",
+                    center=self._offset_position(i + 1),
+                    height=self.image_height,
+                )
+            )
+            self.add_widget(
+                Label(
+                    text=self.points_value_str(),
+                    center=self._label_position(image, i),
+                    font_size=self.image_height * 0.2,
+                )
+            )
         self.add_widget(
             Label(
                 text=self.result_str(),
@@ -290,17 +321,20 @@ class PlayArea(Widget):
             return [0.2, 0.8]
         elif n == 3:
             return [0.15, 0.5, 0.85]
-        elif n == 4:
-            return [0, 0.3, 0.6, 0.9]
-        elif n == 5:
-            return [0, 0.25, 0.5, 0.75, 1]
         else:
-            return list(
-                map(
-                    lambda x: x / 1000,
-                    range(0, 1000 + (step := int(1 / n * 1000)), step),
-                )
-            )
+            return list(self.divider(n))
+
+    @staticmethod
+    def divider(n):
+        counter = 1
+        i = 0
+        while counter <= n:
+            if counter == n:
+                yield 1
+            else:
+                yield i
+            i += round(1 / (n - 1), 2)
+            counter += 1
 
     def dealer_hand(self) -> None:
         if self.dealercards:
@@ -337,6 +371,7 @@ class Screen(BoxLayout):
     shoe = ObjectProperty()
     count_button = ObjectProperty()
     welcome_screen = ObjectProperty()
+    playing_player = None
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
@@ -346,19 +381,20 @@ class Screen(BoxLayout):
         self.game = self.start()
 
     def update(self, *args):
+        cash = self.playing_player.cash  # type: ignore
         self.playarea.dealercards = self.game.dealer.hand
         self.playarea.playerhands = list(
             reversed([hand_play for hand_play in self.game.round.table.hands])
         )
         self.count_button.count = self.game.dealer.shoe.hilo_count
-        self.cash_label.text = "${:>5,.2f}".format(self.game.players[0].cash)
+        self.cash_label.text = "${:>5,.2f}".format(cash)
         shoe = self.game.dealer.shoe
         self.shoe.text = (
             f"DECKS: "
             f"{(len(shoe)-shoe._cut_card)/52:.1f} "
             f"{"SHUFFLE" if shoe.will_shuffle else ""}"
         )
-        self.bet_size.max_bet = self.game.players[0].cash
+        self.bet_size.max_bet = cash
         self.playarea.update()
 
     def on_decision_widget(self, decision):
@@ -382,13 +418,18 @@ class Screen(BoxLayout):
     def start(self, *args) -> Game:
         self.game = Game(
             [
-                Player(None, self.bet_size),
                 Player(MimickDealer(), FixedBettingStrategy(25)),
+                Player(None, self.bet_size),
                 Player(RandomStrategy(), FixedBettingStrategy(50)),
             ]
         )
+        playing_player = [
+            player for player in self.game.players if player.strategy is None
+        ]
+        assert len(playing_player) == 1
+        self.playing_player = playing_player[0]
+        # initialize buttons
         self.on_decision_widget(None)
-        self.update()
         return self.game
 
 

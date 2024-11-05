@@ -492,6 +492,7 @@ class HandPlay:
     hand: Hand = field(default_factory=Hand)
     insurance: float = 0
     splits: int = 0
+    doubled: bool = False
     active: bool = False
     _is_done: bool = field(default=False, repr=False)
     _winnings: float = field(default=0, repr=False)
@@ -657,6 +658,7 @@ class HandPlay:
         self.charge_bet(1)
         self.betsize *= 2
         dealer.deal(self)
+        self.doubled = True
         self.done()
         return State.DONE
 
@@ -766,6 +768,7 @@ class HandPlay:
             for card in reversed(hand)
         ]
         new_hands[0].insurance = insurance
+        new_hands[0]._losses -= insurance
         return new_hands
 
     def __str__(self) -> str:
