@@ -11,6 +11,7 @@ from typing import (
     Callable,
     ClassVar,
     Generator,
+    Generic,
     Iterable,
     Literal,
     NamedTuple,
@@ -312,7 +313,7 @@ class GameStrategy(ABC):
     ) -> PlayDecision: ...
 
     @abstractmethod
-    def insurance(self, dealer_hand: Hand, player_hand: Hand) -> bool: ...
+    def insurance(self, dealer_hand: Hand, player_hand: Hand) -> YesNoDecision: ...
 
     def __repr__(self) -> str:
         return f"{self.__class__.__qualname__}()"
@@ -444,10 +445,39 @@ class PlayDecision(Flag):
             ior, [flag for flag, predicate in zip(cls, predicates) if predicate]
         )
 
+    @classmethod
+    def all(cls):
+        return reduce(ior, [flag for flag in cls])
+
+
+class YesNoDecision(Flag):
+    YES = auto()
+    NO = auto()
+
+    @classmethod
+    def all(cls):
+        return YesNoDecision.YES or YesNoDecision.NO
+
 
 class State(Enum):
     DONE = auto()
     NOT_DONE = auto()
+
+
+D = TypeVar("D", YesNoDecision, PlayDecision)
+
+
+@dataclass
+class Decision(Generic[D]):
+    callable: Callable[[D], list[Self] | Self | State]
+    options: D
+    hand: Hand
+
+    def __iter__(self):
+        return iter((self.callable, self.options, self.hand))
+
+    def __call__(self, *args, **kwargs) -> list[Self] | Self | State:
+        return self.callable(*args, **kwargs)
 
 
 @dataclass
@@ -567,32 +597,33 @@ class HandPlay:
         self.done()
         return State.DONE
 
-    def play_insurance(self, dealer: Dealer) -> State | Callable[[bool], State]:
+    def play_insurance(self, dealer: Dealer) -> State | Decision:
         if self.player.cash < 0.5 * self.betsize:
             return State.DONE
 
         if self.player.strategy is None:
-            return self.process_insurance_decision
+            return Decision(
+                self.process_insurance_decision, YesNoDecision.all(), self.hand
+            )
+
         else:
             return self.process_insurance_decision(
                 self.player.strategy.insurance(dealer.hand, self.hand)
             )
 
-    def process_insurance_decision(self, decision: bool) -> State:
-        if decision:
+    def process_insurance_decision(self, decision: YesNoDecision) -> State:
+        if decision is YesNoDecision.YES:
             self.charge_bet(0.5)
             self.insurance = 0.5 * self.betsize
         return State.DONE
 
-    def play(
-        self, dealer: Dealer
-    ) -> (
-        list[Self] | Self | State | Callable[[PlayDecision], list[Self] | Self | State]
-    ):
+    def play(self, dealer: Dealer) -> list[Self] | Self | State | Decision:
         if self.allowed_choices is None:
             return State.DONE
         if self.player.strategy is None:
-            return partial(self.process_decision, dealer)
+            return Decision(
+                partial(self.process_decision, dealer), self.allowed_choices, self.hand
+            )
         else:
             return self.process_decision(
                 dealer,
@@ -753,7 +784,6 @@ class TablePlay:
         "eval_insurance",
         "cash_out",
     )
-    choices: PlayDecision | None = None
 
     def __iter__(self) -> Self:
         return self
@@ -779,29 +809,28 @@ class TablePlay:
         # Hand that returns State.DONE is done, otherwise it needs further processing
         for hand_play in self:
             method = getattr(hand_play, name)
-            hand_hands_or_none = method(dealer)
+            hand_hands_or_done = method(dealer)
 
-            if callable(hand_hands_or_none):
-                self.choices = hand_play.allowed_choices
+            if callable(hand_hands_or_done):
                 hand_play.active = True
-                feedback = yield hand_hands_or_none
+                feedback = yield hand_hands_or_done
                 if feedback is not None:
-                    hand_hands_or_none = feedback
+                    hand_hands_or_done = feedback
 
-            if hand_hands_or_none is State.DONE:
+            if hand_hands_or_done is State.DONE:
                 hand_play.active = False
                 self._done.append(hand_play)
-            elif hasattr(hand_hands_or_none, "__iter__"):
-                assert not callable(hand_hands_or_none)
-                self._hands.extend(hand_hands_or_none)
+            elif hasattr(hand_hands_or_done, "__iter__"):
+                assert not callable(hand_hands_or_done)
+                self._hands.extend(hand_hands_or_done)
             else:
                 try:
-                    assert isinstance(hand_hands_or_none, HandPlay)
+                    assert isinstance(hand_hands_or_done, HandPlay)
                 except AssertionError as e:
                     raise GameError(
-                        f"Wrong hand received from play: {hand_hands_or_none}"
+                        f"Wrong hand received from play: {hand_hands_or_done}"
                     ) from e
-                self._hands.append(hand_hands_or_none)
+                self._hands.append(hand_hands_or_done)
             self._in_progress = None
 
     @property
@@ -819,41 +848,32 @@ class TablePlay:
         return f"TablePlay(hands={self.hands})"
 
 
-@dataclass
-class DecisionCallable:
-    callable: Callable
-
-    def __call__(self, decision):
-        return self.callable(decision)
-
-
-class InsuranceDecisionCallable(DecisionCallable):
-    pass
-
-
-class PlayDecisionCallable(DecisionCallable):
-    pass
-
-
-class DecisionTuple(NamedTuple):
-    callable: Callable
-    options: Iterable
-
-
 class DecisionHandler:
+    newDecisionEven = PubSubDecorator()
 
     def __init__(
         self,
         gen: Generator,
         next_step: Callable,
-        decision_tuple: DecisionTuple,
+        decision: Decision,
     ):
         self.gen = gen
         self.next_step = next_step
-        self.decision_function, self.choices = decision_tuple
-        self.decision_callable = None
+        self.decision = decision
 
+        self._decision_callable: Decision | None = None
+
+        self.decision_function, self.choices, self.hand = decision
         self.make_callable()
+
+    @property
+    def decision_callable(self):
+        return self._decision_callable
+
+    @decision_callable.setter
+    def decision_callable(self, decision: Decision | None):
+        self._decision_callable = decision
+        self.newDecisionEven.publish(self)
 
     @classmethod
     def from_gen(cls, gen: Generator, next_step: Callable) -> Self | None:
@@ -864,137 +884,60 @@ class DecisionHandler:
         else:
             return cls(gen, next_step, decision_tuple)
 
-    def __call__(self, decision):
+    def __call__(self, decision: PlayDecision | YesNoDecision) -> None:
         assert self.decision_callable is not None
         self.decision_callable(decision)
 
     def make_callable(self):
 
-        def inner(decision: PlayDecision | bool):
-            self.decision_callable = None
+        def inner(decision: PlayDecision | YesNoDecision):
             self.choices = None
+            self.decision_callable = None
             try:
                 next_decision_tuple = self.gen.send(self.decision_function(decision))
             except StopIteration:
                 self.next_step()
             else:
-                self.decision_function, self.choices = next_decision_tuple
+                self.decision_function, self.choices, self.hand = next_decision_tuple
                 self.make_callable()
 
         self.decision_callable = inner
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__qualname__}({self.gen})"
+        return (
+            f"{self.__class__.__qualname__}({self.gen}, {self.next_step}, "
+            f"{self.decision})"
+        )
 
 
 @dataclass
 class Round:
-    newDecisionEvent: ClassVar = PubSubDecorator()
     cashOutEvent: ClassVar = PubSubDecorator()
     dealer: Dealer
     table: TablePlay
-    _decision_callable: DecisionCallable | None = None
 
-    @property
-    def decision_callable(self):
-        return self._decision_callable
-
-    @decision_callable.setter
-    def decision_callable(self, value: DecisionCallable | None):
-        self._decision_callable = value
-        self.newDecisionEvent.publish(value)
-
-    @property
-    def choices(self) -> PlayDecision:
-        try:
-            assert self.table.choices
-        except AssertionError as e:
-            raise GameError("Accessing choices when none are available") from e
-        return self.table.choices
-
-    def process_decision(
-        self,
-        gen: Generator,
-        next_function: Callable,
-        decision_type: Literal["play", "insurance"] = "play",
-    ) -> Self | None:
-
-        try:
-            decision_function = next(gen)
-        except StopIteration:
-            return next_function()
-        else:
-            self.make_callable(gen, next_function, decision_function, decision_type)
-
-    def make_callable(
-        self,
-        gen: Generator,
-        next_function: Callable,
-        decision_function: Callable,
-        decision_type: Literal["play", "insurance"],
-    ):
-
-        def inner(decision: PlayDecision | bool):
-            self.decision_callable = None
+    @staticmethod
+    def step(func):
+        @wraps(func)
+        def wrapper(self) -> Self | None:
             try:
-                next_decision_function = gen.send(decision_function(decision))
+                next_step = next(self._step)
             except StopIteration:
-                next_function()
+                next_step = self.finalize
+
+            if (gen := func(self)) is None:
+                return next_step()
             else:
-                self.make_callable(
-                    gen, next_function, next_decision_function, decision_type
-                )
+                if DecisionHandler.from_gen(gen, next_step):
+                    return
+                else:
+                    return next_step()
 
-        decision_class = {
-            "play": PlayDecisionCallable,
-            "insurance": InsuranceDecisionCallable,
-        }.get(decision_type)
+        return wrapper
 
-        if decision_class:
-            self.decision_callable = decision_class(inner)
-
-    def shuffle(self) -> Self | None:
-        self.dealer.shuffle()
-        return self.deal()
-
-    def deal(self) -> Self | None:
-        if self.table.hands:
-            self.table.deal_card(self.dealer)
-            self.dealer.deal_self()
-            self.table.deal_card(self.dealer)
-            return self.offer_insurance()
-        else:
-            return self  # need to break out of the gen and stop playing
-
-    def offer_insurance(self) -> Self | None:
-        if self.dealer.has_ace:
-            insurance_result = self.table.play_insurance(self.dealer)
-            return self.process_decision(
-                insurance_result, self.player_play, "insurance"
-            )
-        return self.player_play()
-
-    def player_play(self) -> Self | None:
-        play_results = self.table.play(self.dealer)
-        return self.process_decision(play_results, self.dealer_play)
-
-    def dealer_play(self) -> Self | None:
-        self.dealer.play(self.table.hands)
-        return self.eval_insurance()
-
-    def eval_insurance(self) -> Self | None:
-        evi = self.table.eval_insurance(self.dealer)
-        return self.process_decision(evi, self.eval_hands)
-
-    def eval_hands(self) -> Self | None:
-        ev = self.table.eval_hand(self.dealer)
-        return self.process_decision(ev, self.cash_out)
-
-    def cash_out(self) -> Self | None:
-        co = self.table.cash_out(self.dealer)
-        p = self.process_decision(co, lambda: self)
-        self.cashOutEvent.publish(self)
-        return p
+    def steps(self):
+        for i in self.pipe:
+            yield i
 
     @property
     def pipe(self) -> list[Callable]:
@@ -1009,29 +952,7 @@ class Round:
             self.cash_out,
         ]
 
-    @staticmethod
-    def step(func):
-        def wrapper(self) -> Self | None:
-            try:
-                next_step = next(self._step)
-            except StopIteration:
-                return self
-
-            if (gen := func()) is None:
-                return next_step()
-            else:
-                if decision_callable := DecisionHandler.from_gen(gen, next_step):
-                    self.decision_callable = decision_callable
-                else:
-                    return next_step()
-
-        return wrapper
-
-    def steps(self):
-        for i in self.pipe:
-            yield i
-
-    def _play(self) -> Self | None:
+    def play(self) -> Self | None:
         self._step = self.steps()
         try:
             first_step = next(self._step)
@@ -1039,8 +960,44 @@ class Round:
             return self
         return first_step()
 
-    def play(self) -> Self | None:
-        return self.shuffle()
+    @step
+    def shuffle(self) -> None:
+        self.dealer.shuffle()
+
+    @step
+    def deal(self) -> None:
+        if self.table.hands:
+            self.table.deal_card(self.dealer)
+            self.dealer.deal_self()
+            self.table.deal_card(self.dealer)
+
+    @step
+    def offer_insurance(self) -> Generator | None:
+        if self.dealer.has_ace:
+            return self.table.play_insurance(self.dealer)
+
+    @step
+    def player_play(self) -> Generator:
+        return self.table.play(self.dealer)
+
+    @step
+    def dealer_play(self) -> None:
+        self.dealer.play(self.table.hands)
+
+    @step
+    def eval_insurance(self) -> Generator:
+        return self.table.eval_insurance(self.dealer)
+
+    @step
+    def eval_hands(self) -> Generator:
+        return self.table.eval_hand(self.dealer)
+
+    @step
+    def cash_out(self) -> Generator:
+        return self.table.cash_out(self.dealer)
+
+    def finalize(self):
+        self.cashOutEvent.publish()
 
 
 class NotEnoughCash(Exception):

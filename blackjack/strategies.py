@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from typing import Any
 
-from .engine import BettingStrategy, GameStrategy, Hand, PlayDecision
+from .engine import BettingStrategy, GameStrategy, Hand, PlayDecision, YesNoDecision
 
 
 class RandomStrategy(GameStrategy):
@@ -13,8 +13,8 @@ class RandomStrategy(GameStrategy):
     ) -> PlayDecision:
         return random.choice(list(choices))
 
-    def insurance(self, dealer_hand: Hand, player_hand: Hand) -> bool:
-        return random.choice((True, False))
+    def insurance(self, dealer_hand: Hand, player_hand: Hand) -> YesNoDecision:
+        return random.choice(list(YesNoDecision))
 
 
 class MimickDealer(GameStrategy):
@@ -24,8 +24,8 @@ class MimickDealer(GameStrategy):
     ) -> PlayDecision:
         return PlayDecision.HIT if player_hand.value < 18 else PlayDecision.STAND
 
-    def insurance(self, dealer_hand: Hand, player_hand: Hand) -> bool:
-        return random.choice((True, False))
+    def insurance(self, dealer_hand: Hand, player_hand: Hand) -> YesNoDecision:
+        return YesNoDecision.NO
 
 
 class FixedBettingStrategy(BettingStrategy):

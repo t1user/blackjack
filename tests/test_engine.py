@@ -13,6 +13,7 @@ from blackjack.engine import (
     Player,
     Shoe,
     State,
+    YesNoDecision,
 )
 from blackjack.strategies import FixedBettingStrategy, RandomStrategy
 
@@ -414,7 +415,6 @@ class TestPlayer:
         assert player.cash == 110
 
     def test_cash_charges(self, player: Player):
-        print(id(player), player)
         player.charge(10)
         assert player.cash == 90
 
@@ -656,7 +656,7 @@ class TestHandPlay:
     def always_insuring_player(self):
         class PositiveInsuranceGameStrategy(RandomStrategy):
             def insurance(self, dealer_hand: Hand, player_hand: Hand):
-                return True
+                return YesNoDecision.YES
 
         return Player(PositiveInsuranceGameStrategy(), FixedBettingStrategy(5))
 
@@ -771,8 +771,10 @@ class TestHandPlay:
 
         dealer = Dealer(hand=Hand(Card("K", "H"), Card("K", "D")))
 
-        hand_play += Card("Q", "S")
-        hand_play += Card("8", "H")
+        # Will be getting one more card on double
+        # make sure it's impossible to win!
+        hand_play += Card("2", "S")
+        hand_play += Card("2", "H")
 
         hand_play.play(dealer)
 
