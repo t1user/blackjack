@@ -84,20 +84,15 @@
         text: 'DEAL'
         on_release: app.screen.play()
 
+<YesNoButton>:
+    size_hint_x: .25
+
 <InsuranceButtons>:
     spacing: root.width * 0.05
     padding: [40, 1, 40, 1]
     Label:
-        text: 'INSURANCE?'
         size_hint_x: .5
-    Button:
-        size_hint_x: .25
-        text: 'Yes'
-        on_release: root.yes()
-    Button:
-        size_hint_x: .25
-        text: 'No'
-        on_release: root.no()  
+
 
 <KivyBettingStrategy>:
     
@@ -106,7 +101,6 @@
     title: 'Welcome!'
     title_align: 'center'
     size_hint: .5, .5
-    #pos_hint: {"x":.2, "top": .9}
     Label:
         text: "BlackJack"
 

@@ -2,7 +2,6 @@ import math
 from typing import Any, Callable
 
 from kivy.app import App
-from kivy.clock import Clock
 from kivy.core.window import Window
 from kivy.graphics import Color, Line
 from kivy.properties import NumericProperty, ObjectProperty
@@ -10,27 +9,25 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.image import Image
 from kivy.uix.label import Label
-from kivy.uix.modalview import ModalView
-from kivy.uix.popup import Popup
 from kivy.uix.slider import Slider
 from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.widget import Widget
 
 from blackjack import engine
 from blackjack.engine import (
+    DecisionHandler,
     Game,
     Hand,
     HandPlay,
-    InsuranceDecisionCallable,
     PlayDecision,
-    PlayDecisionCallable,
     Player,
     Round,
+    YesNoDecision,
 )
 from blackjack.strategies import FixedBettingStrategy, MimickDealer, RandomStrategy
 
 SIZE_RATIO = 0.65  # percentage of play area over which cards are to be distributed
-IMAGE_HEIGHT_RATIO = 0.2  # image height as proportion of window height
+IMAGE_HEIGHT_RATIO = 0.15  # image height as proportion of window height
 
 
 class CountButton(ToggleButton):
@@ -46,7 +43,7 @@ class CountButton(ToggleButton):
 class PlayDecisionButton(Button):
     action = ObjectProperty()
 
-    def __init__(self, action: PlayDecision, **kwargs):
+    def __init__(self, action: PlayDecision | YesNoDecision, **kwargs):
         super().__init__(**kwargs)
         self.action = action
         self.text = action.name
@@ -57,9 +54,9 @@ class PlayDecisionButton(Button):
 
 
 class DecisionButtons(BoxLayout):
-    decision = ObjectProperty(None, allownone=True)
+    decision = ObjectProperty()
 
-    def __init__(self, choices: PlayDecision, callable: Callable, **kwargs):
+    def __init__(self, callable: Callable, choices: PlayDecision, Hand, **kwargs):
         super().__init__(**kwargs)
         self.callable = callable
         for action in PlayDecision:
@@ -71,18 +68,21 @@ class DecisionButtons(BoxLayout):
         self.callable(decision)
 
 
+class YesNoButton(PlayDecisionButton):
+    pass
+
+
 class InsuranceButtons(BoxLayout):
     decision = ObjectProperty()
 
-    def __init__(self, callable: Callable, **kwargs) -> None:
+    def __init__(
+        self, callable: Callable, choices: YesNoDecision, hand: Hand, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self.callable = callable
-
-    def yes(self, *args):
-        self.decision = True
-
-    def no(self, *args):
-        self.decision = False
+        self.children[0].text = "EVEN MONEY?" if hand.is_blackjack() else "INSURANCE?"
+        for action in YesNoDecision:
+            self.add_widget(YesNoButton(action))
 
     def on_decision(self, _, decision):
         self.callable(decision)
@@ -175,13 +175,13 @@ class PlayerHand(HandWidget):
         self,
         pos: tuple[float, float],
         hand_play: HandPlay,
+        active: bool = False,
         **kwargs,
     ) -> None:
         Widget.__init__(self, **kwargs)
         self.center = pos
         self.hand = hand_play.hand
         self.hand_play = hand_play
-        active = hand_play.active
         if len(self.hand) > 0:
             self.render()
         if active:
@@ -278,7 +278,8 @@ class PlayArea(Widget):
             self.get_player_position_indexes(len(self.playerhands)), self.playerhands
         ):
             position = self.get_position(position_index)
-            hand_widget = PlayerHand(position, hand)
+            active = hand.active if len(self.playerhands) > 1 else False
+            hand_widget = PlayerHand(position, hand, active)
             self.add_widget(hand_widget)
 
     def get_player_position_indexes(self, n: int):
@@ -337,17 +338,14 @@ class Screen(BoxLayout):
     count_button = ObjectProperty()
     welcome_screen = ObjectProperty()
 
-    # decision_widget = ObjectProperty(allownone=True)
-
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         Hand.newCardEvent += self.update
-        Round.newDecisionEvent += self.on_decision_widget
+        DecisionHandler.newDecisionEven += self.on_decision_widget
         Round.cashOutEvent += self.update
         self.game = self.start()
 
     def update(self, *args):
-        # self.decision_widget = self.game.round.decision_callable
         self.playarea.dealercards = self.game.dealer.hand
         self.playarea.playerhands = list(
             reversed([hand_play for hand_play in self.game.round.table.hands])
@@ -364,20 +362,19 @@ class Screen(BoxLayout):
         self.playarea.update()
 
     def on_decision_widget(self, decision):
-        if isinstance(decision, InsuranceDecisionCallable):
-            self.buttonstrip.clear_widgets()
-            self.buttonstrip.add_widget(InsuranceButtons(decision))
-        elif isinstance(decision, PlayDecisionCallable):
-            self.buttonstrip.clear_widgets()
-            assert self.game.round
-            self.buttonstrip.add_widget(
-                DecisionButtons(self.game.round.choices, decision)
-            )
-        elif decision is None:
-            self.buttonstrip.clear_widgets()
+        self.buttonstrip.clear_widgets()
+        if decision is None or decision.choices is None:
             self.buttonstrip.add_widget(DealButton())
             self.bet_size.disabled = False
-        self.playarea.update()
+        elif isinstance(decision.choices, YesNoDecision):
+            self.buttonstrip.add_widget(
+                InsuranceButtons(decision, decision.choices, decision.hand)
+            )
+        elif isinstance(decision.choices, PlayDecision):
+            self.buttonstrip.add_widget(
+                DecisionButtons(decision, decision.choices, decision.hand)
+            )
+        self.update()
 
     def play(self, *args, **kwargs):
         self.game.play()
@@ -391,7 +388,6 @@ class Screen(BoxLayout):
             ]
         )
         self.on_decision_widget(None)
-        # self.bet_size.disabled = False
         self.update()
         return self.game
 
