@@ -6,32 +6,25 @@ from dataclasses import dataclass, field
 from enum import Enum, Flag, auto
 from functools import cached_property, partial, reduce, wraps
 from operator import ior
-from typing import (
-    Any,
-    Callable,
-    ClassVar,
-    Generator,
-    Generic,
-    Iterable,
-    Literal,
-    NamedTuple,
-    Self,
-    TypeVar,
-)
+from typing import Any, Callable, ClassVar, Generator, Generic, Self, TypeVar
 
 from .helpers import PubSubDecorator
 
 # ### Rules ###
-MAX_SPLITS = -1  # negative number means no limit
-SINGLE_CARD_ON_SPLIT_ACES = True
-RESPLIT_ACES = True
-BURN_PERCENT_RANGE = (20, 25)  # penetration percentage range (min, max)
-NUMBER_OF_DECKS = 6
-PLAYER_CASH = 1_000
-BLACKJACK_PAYOUT = 3 / 2
-TABLE_LIMITS = (5, 50)
-SURRENDER = True  # No extra conditions DON'T CHANGE IT, NOT READY YET
-DOUBLE_ON_SPLIT = True
+CONFIG = {
+    "max_splits": -1,  # negative number means no limit
+    "single_card_on_split_aces": True,
+    "resplit_aces": True,
+    "double_after_split": True,
+    "blackjack_payout": 3 / 2,
+    "surrender": True,  # No extra conditions DON'T CHANGE IT, NOT READY YET
+    "player_cash": 1_000,
+    "table_min": 5,
+    "table_max": 50,
+    "penetration_min": 75,
+    "penetration_max": 80,  # penetration percentage range (min, max)
+    "number_of_decks": 6,
+}
 # ### End-rules ###
 
 SUITS = ["S", "H", "D", "C"]
@@ -127,7 +120,13 @@ class Shoe(list[Card]):
         self.hilo_count = 0
         self.extend([*DECK * self.decks])
         random.shuffle(self)
-        self._cut_card = int(random.randint(*BURN_PERCENT_RANGE) * len(self) / 100)
+        self._cut_card = int(
+            random.randint(
+                100 - CONFIG["penetration_max"], 100 - CONFIG["penetration_min"]
+            )
+            * len(self)
+            / 100
+        )
 
     def deal(self) -> Card:
         card = self.pop()
@@ -341,7 +340,7 @@ class DealerStrategy:
 
 @dataclass
 class Dealer:
-    shoe: Shoe = field(default_factory=partial(Shoe, NUMBER_OF_DECKS))
+    shoe: Shoe = field(default_factory=partial(Shoe, CONFIG["number_of_decks"]))
     hand: Hand = field(default_factory=Hand)
     strategy: DealerStrategy = DealerStrategy()
 
@@ -405,7 +404,7 @@ class Dealer:
 class Player:
     strategy: GameStrategy | None
     betting_strategy: BettingStrategy
-    cash: float = PLAYER_CASH
+    cash: float = CONFIG["player_cash"]
     number_of_hands: int = 1
 
     def charge(self, amount: float) -> float:
@@ -510,9 +509,9 @@ class HandPlay:
         except NotEnoughCash:
             betsize = player.cash
 
-        if betsize > TABLE_LIMITS[1]:
-            return cls(player, TABLE_LIMITS[1])
-        elif betsize >= TABLE_LIMITS[0]:
+        if betsize > CONFIG["table_min"]:
+            return cls(player, CONFIG["table_max"])
+        elif betsize >= CONFIG["table_min"]:
             return cls(player, betsize)
         else:
             # cash that the player has is lower than table minimum
@@ -578,7 +577,7 @@ class HandPlay:
     @property
     def is_done(self) -> bool:
         # override for a split hand
-        if self.hand.is_double_aces() and RESPLIT_ACES:
+        if self.hand.is_double_aces() and CONFIG["resplit_aces"]:
             self._is_done = False
         else:
             self._is_done = (
@@ -671,7 +670,7 @@ class HandPlay:
         self.charge_bet()
         is_done = (
             True
-            if (SINGLE_CARD_ON_SPLIT_ACES and self.hand.is_double_aces())
+            if (CONFIG["single_card_on_split_aces"] and self.hand.is_double_aces())
             else self._is_done
         )
         new_hands = self.__class__._split(
@@ -685,7 +684,7 @@ class HandPlay:
         for hand_play in new_hands:
             dealer.deal(hand_play)
             # override allowing to resplit aces if rules permit
-            if RESPLIT_ACES and hand_play.hand.is_double_aces():
+            if CONFIG["resplit_aces"] and hand_play.hand.is_double_aces():
                 hand_play._is_done = False
         return new_hands
 
@@ -728,7 +727,7 @@ class HandPlay:
     @check_if_done_first
     def can_surrender(self) -> bool:
         # override to enter surrender conditions
-        if not SURRENDER:
+        if not CONFIG["surrender"]:
             return False
         elif len(self.hand) > 2 or self.splits:
             return False
@@ -739,7 +738,7 @@ class HandPlay:
     def can_double(self) -> bool:
         if self.player.cash < self.betsize:
             return False
-        elif (not DOUBLE_ON_SPLIT) and self.splits:
+        elif (not CONFIG["double_after_split"]) and self.splits:
             return False
         else:
             return len(self.hand) == 2
@@ -748,7 +747,7 @@ class HandPlay:
     def can_split(self) -> bool:
         if self.player.cash < self.betsize:
             return False
-        elif (MAX_SPLITS > 0) and (self.splits > MAX_SPLITS):
+        elif (CONFIG["max_splits"] > 0) and (self.splits > CONFIG["max_splits"]):
             return False
         else:
             return self.hand.can_split()
