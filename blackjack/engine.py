@@ -24,6 +24,7 @@ from .helpers import PubSubDecorator
 # ### Rules ###
 MAX_SPLITS = -1  # negative number means no limit
 SINGLE_CARD_ON_SPLIT_ACES = True
+RESPLIT_ACES = True
 BURN_PERCENT_RANGE = (20, 25)  # penetration percentage range (min, max)
 NUMBER_OF_DECKS = 6
 PLAYER_CASH = 1_000
@@ -189,7 +190,7 @@ class Hand(list[Card]):
         return any([card.rank == "A" for card in self])
 
     def is_double_aces(self) -> bool:
-        return all([card.is_ace for card in self])
+        return len(self) == 2 and all([card.is_ace for card in self])
 
     def is_blackjack(self) -> bool:
         if self._no_blackjack:
@@ -576,16 +577,20 @@ class HandPlay:
 
     @property
     def is_done(self) -> bool:
-        self._is_done = (
-            # has manually been set to done
-            self._is_done
-            # is bust
-            or self.is_bust
-            # is blackjack
-            or self.hand.is_blackjack()
-            # is 21 (you may still want to hit soft 21)
-            or self.hand.hard_value == 21
-        )
+        # override for a split hand
+        if self.hand.is_double_aces() and RESPLIT_ACES:
+            self._is_done = False
+        else:
+            self._is_done = (
+                # has manually been set to done
+                self._is_done
+                # is bust
+                or self.is_bust
+                # is blackjack
+                or self.hand.is_blackjack()
+                # is 21 (you may still want to hit soft 21)
+                or self.hand.hard_value == 21
+            )
         return self._is_done
 
     def done(self) -> None:
@@ -761,6 +766,7 @@ class HandPlay:
         hand: Hand,
         splits: int,
         insurance: float,
+        _is_done: bool,
         **kwargs: Any,
     ) -> list[Self]:
         new_hands = [
