@@ -1,8 +1,11 @@
+import json
 import math
-from importlib.util import source_from_cache
-from typing import Any, Callable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable, Type
 
 from kivy.app import App
+from kivy.config import Config
 from kivy.core.window import Window
 from kivy.graphics import Color, Line
 from kivy.properties import NumericProperty, ObjectProperty
@@ -10,14 +13,17 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.image import Image
 from kivy.uix.label import Label
+from kivy.uix.settings import SettingsWithSidebar
 from kivy.uix.slider import Slider
 from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.widget import Widget
 
-from blackjack import engine
+from blackjack import engine, strategies
 from blackjack.engine import (
+    BettingStrategy,
     DecisionHandler,
     Game,
+    GameStrategy,
     Hand,
     HandPlay,
     PlayDecision,
@@ -190,12 +196,12 @@ class PlayerHand(HandWidget):
         if len(self.hand) > 0:
             self.render()
         if active:
-            with self.canvas.before:
+            with self.canvas.before:  # type: ignore
                 Color(1, 0, 0)  # Set color to red
                 self.frame = Line(
                     rectangle=self.get_bounding_box(), width=1
                 )  # Draw the red frame
-                self.bind(pos=self.update_frame, size=self.update_frame)
+                self.bind(pos=self.update_frame, size=self.update_frame)  # type: ignore
 
     def get_bounding_box(self):
         # Initialize with the widget's own position and size
@@ -344,8 +350,8 @@ class PlayArea(Widget):
 
     def get_position(self, t):
         """Return position coordinates on an ellipse for a position index t.
-        t must be in the range -1,1.
-        players are position in the area 0, 1
+        t must be in the range <-1,1>.
+        players are positioned in the area <0, 1>
         dealer is always at position -0.5
         """
         assert -1 <= t <= 1
@@ -373,8 +379,9 @@ class Screen(BoxLayout):
     welcome_screen = ObjectProperty()
     playing_player = None
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, config, **kwargs: Any) -> None:
         super().__init__(**kwargs)
+        self.config = config
         Hand.newCardEvent += self.update
         DecisionHandler.newDecisionEven += self.on_decision_widget
         Round.cashOutEvent += self.update
@@ -407,6 +414,7 @@ class Screen(BoxLayout):
                 InsuranceButtons(decision, decision.choices, decision.hand)
             )
         elif isinstance(decision.choices, PlayDecision):
+            self.bet_size.disabled = True
             self.buttonstrip.add_widget(
                 DecisionButtons(decision, decision.choices, decision.hand)
             )
@@ -416,13 +424,14 @@ class Screen(BoxLayout):
         self.game.play()
 
     def start(self, *args) -> Game:
-        self.game = Game(
-            [
-                Player(MimickDealer(), FixedBettingStrategy(25)),
-                Player(None, self.bet_size),
-                Player(RandomStrategy(), FixedBettingStrategy(50)),
-            ]
-        )
+        player_config = dict(self.config["players"])
+        assert player_config is not None
+        players = PlayerFactory(player_config, self.bet_size).players
+        print(f"players: {players} {len(players)}")
+        if len(players) == 1 and players[0].number_of_hands == 0:
+            players[0].number_of_hands = 1
+        self.game = Game(players)
+
         playing_player = [
             player for player in self.game.players if player.strategy is None
         ]
@@ -433,12 +442,84 @@ class Screen(BoxLayout):
         return self.game
 
 
+@dataclass
+class PlayerFactory:
+    """
+    Creates appropriate players based on provided config from settings.
+    """
+
+    config: dict[str, str]
+    betting_strategy: BettingStrategy
+
+    @property
+    def players(self):
+        return self.player_factory()
+
+    def player_factory(
+        self,
+    ) -> list[Player]:
+        players = self.npc_factory()
+        players.insert(
+            1,
+            Player(
+                None,
+                self.betting_strategy,
+                number_of_hands=int(self.config["number_of_hands"]),
+            ),
+        )
+        return [player for player in players if player]
+
+    def npc_factory(self) -> list[Player]:
+        npc_players = []
+        for param in ("l_strategy", "r_strategy"):
+            strategy_str = self.config.get(param)
+            assert strategy_str is not None
+            strategy_cls = self._translate_strategy_config(strategy_str)
+            if strategy_cls is not None:
+                npc_players.append(Player(strategy_cls(), FixedBettingStrategy(25)))
+            else:
+                npc_players.append(None)
+        return npc_players
+
+    @staticmethod
+    def _translate_strategy_config(item: str) -> type[GameStrategy] | None:
+        if not hasattr(strategies, item):
+            return None
+        elif not issubclass(getattr(strategies, item), GameStrategy):
+            return None
+        return getattr(strategies, item)
+
+
 class BlackjackApp(App):
 
     def build(self):
-        self.screen = Screen()
+        self.settings_cls = SettingsWithSidebar
+        self.use_kivy_settings = False
+        self.screen = Screen(self.config)
         # Clock.schedule_interval(self.screen.update, 0.25)
         return self.screen
+
+    def build_config(self, config):
+        print("BUILD_CONFIG called")
+        config.setdefaults(
+            "players",
+            {
+                "number_of_hands": 1,
+                "r_strategy": None,
+                "l_strategy": None,
+            },
+        )
+
+    def build_settings(self, settings):
+        with open("blackjack/interfaces/kivy/settings.json", "rt") as settings_json:
+            settings.add_json_panel("Players", self.config, data=settings_json.read())
+
+    def on_config_change(self, config, section, key, value):
+        pass
+
+    def close_settings(self, *args, **kwargs):
+        super().close_settings(*args, **kwargs)
+        self.screen.start()
 
 
 if __name__ == "__main__":

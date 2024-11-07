@@ -1,0 +1,38 @@
+[
+    {
+        "type": "options",
+        "title": "Number of hands",
+        "desc": "Number of hands you want to play",
+        "section": "players",
+        "key": "number_of_hands",
+        "options": [
+            "0",
+            "1",
+            "2"
+        ]
+    },
+    {
+        "type": "options",
+        "title": "Right NPC",
+        "desc": "Strategy of Non-Playing Character placed to the right of player.",
+        "section": "players",
+        "key": "r_strategy",
+        "options": [
+            "RandomStrategy",
+            "MimickDealer",
+            "None"
+        ]
+    },
+    {
+        "type": "options",
+        "title": "Left NPC",
+        "desc": "Strategy of Non-Playing Character placed to the right of player.",
+        "section": "players",
+        "key": "l_strategy",
+        "options": [
+            "RandomStrategy",
+            "MimickDealer",
+            "None"
+        ]
+    }
+]

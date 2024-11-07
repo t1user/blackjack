@@ -46,10 +46,12 @@
             on_release: root.start()
         Button:
             size_hint_x: .05
+            on_release: app.open_settings()
             Image: 
                 source: "hamburger_icon_white.png"
                 center_x: self.parent.center_x
                 center_y: self.parent.center_y
+            
     PlayArea:
         id: playarea
         size_hint_y: .8
