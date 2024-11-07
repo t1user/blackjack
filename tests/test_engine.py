@@ -526,7 +526,7 @@ class TestHandPlay:
         hand_play.double(dealer)
         assert hand_play.player.cash + betsize == starting_cash
 
-    def test_split_returns_list_of_two_cards(self, hand_play: HandPlay, dealer: Dealer):
+    def test_split_returns_list_of_two_hands(self, hand_play: HandPlay, dealer: Dealer):
         hand_play += Card("A", "S")
         hand_play += Card("A", "H")
         return_value = hand_play.split(dealer)
@@ -552,6 +552,13 @@ class TestHandPlay:
         assert len(testing_hand.hand) == 2
         assert testing_card in testing_hand.hand
         assert testing_hand.splits == 1
+
+    def test_resplit_aces_are_done(self, hand_play: HandPlay, dealer: Dealer):
+        hand_play += Card("A", "S")
+        hand_play += Card("A", "H")
+        hand_play_1, hand_play_2 = hand_play.split(dealer)
+        assert hand_play_1.is_done
+        assert hand_play_2.is_done
 
     def test_split_returned_second_hand(self, hand_play: HandPlay, dealer: Dealer):
         hand_play += Card("A", "S")

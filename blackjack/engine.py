@@ -684,6 +684,9 @@ class HandPlay:
         )
         for hand_play in new_hands:
             dealer.deal(hand_play)
+            # override allowing to resplit aces if rules permit
+            if RESPLIT_ACES and hand_play.hand.is_double_aces():
+                hand_play._is_done = False
         return new_hands
 
     def hit(self, dealer: Dealer) -> Self:
@@ -766,7 +769,6 @@ class HandPlay:
         hand: Hand,
         splits: int,
         insurance: float,
-        _is_done: bool,
         **kwargs: Any,
     ) -> list[Self]:
         new_hands = [
