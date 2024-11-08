@@ -18,6 +18,7 @@ CONFIG = {
     "resplit_aces": True,
     "double_restrictions": (),
     "double_after_split": True,
+    "any_tens_split": True,
     "blackjack_payout": 3 / 2,
     "surrender": True,  # No extra conditions DON'T CHANGE IT, NOT READY YET
     "player_cash": 1_000,
@@ -199,7 +200,11 @@ class Hand(list[Card]):
     def can_split(self) -> bool:
         return (len(self) == 2) and (
             (self[0].rank == self[1].rank)
-            or all([(card.rank in FACES) for card in self])
+            or (
+                all([(card.rank in FACES) for card in self])
+                if CONFIG["any_tens_split"]
+                else False
+            )
         )
 
     def value_str(self) -> str:

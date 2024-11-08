@@ -379,7 +379,6 @@ class Screen(BoxLayout):
     count_button = ObjectProperty()
     welcome_screen = ObjectProperty()
 
-    number_of_hands = NumericProperty(1)
     playing_player = None
 
     def __init__(self, config, **kwargs: Any) -> None:
@@ -407,7 +406,7 @@ class Screen(BoxLayout):
         self.bet_size.max_bet = cash
         self.playarea.update()
 
-    def on_number_of_hands(self, _, hands: int):
+    def on_number_of_hands(self, hands: int) -> None:
         if self.playing_player is not None:
             self.playing_player.number_of_hands = hands
 
@@ -421,6 +420,7 @@ class Screen(BoxLayout):
 
     def on_decision_widget(self, decision):
         self.buttonstrip.clear_widgets()
+        assert self.playing_player
         if decision is None or decision.choices is None:
             self.buttonstrip.add_widget(DealButton())
             self.bet_size.disabled = False
@@ -440,11 +440,9 @@ class Screen(BoxLayout):
 
     def start(self, *args) -> Game:
         player_config = dict(self.config["players"])
-        print(f"{player_config=}")
         assert player_config is not None
         self.bet_size.reset()
         players = PlayerFactory(player_config, self.bet_size).players
-        print(f"{players=}")
         if len(players) == 1 and players[0].number_of_hands == 0:
             players[0].number_of_hands = 1
         self.game = Game(players)
@@ -616,7 +614,7 @@ class BlackjackApp(App):
             CONFIG[key] = result
         elif section == "players":
             if key == "number_of_hands":
-                self.screen.number_of_hands = value
+                self.screen.on_number_of_hands(int(value))
             else:
                 self.screen.update_npc()
 

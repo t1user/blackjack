@@ -15,15 +15,15 @@
     },
     {
         "type": "bool",
-        "title": "Only single card on split aces",
-        "desc": "After splitting double aces only one card will be dealt",
+        "title": "Only single card on split Aces",
+        "desc": "If ON after splitting double Aces only one card will be dealt; otherwise double Aces are treated as any other hand",
         "section": "rules",
         "key": "single_card_on_split_aces"
     },
     {
         "type": "bool",
-        "title": "Resplit aces",
-        "desc": "Double aces can be re-split regardless of other rules",
+        "title": "Resplit Aces",
+        "desc": "Double Aces can be re-split regardless of other rules",
         "section": "rules",
         "key": "resplit_aces"
     },
@@ -45,6 +45,13 @@
         "desc": "Whether double is allowed after split; other double restrictions hold",
         "section": "rules",
         "key": "double_after_split"
+    },
+    {
+        "type": "bool",
+        "title": "Any 10s can split",
+        "desc": "If ON any two card with value 10 can split; otherwise 10s can split only if they are same rank, e.g. KK, QQ, etc",
+        "section": "rules",
+        "key": "any_tens_split"
     },
     {
         "type": "fraction_options",
@@ -87,7 +94,7 @@
     {
         "type": "percent_numeric",
         "title": "Penetration (%)",
-        "desc": "Target shoe penetration in percent (5-95); actual penetration will vary +/-5%",
+        "desc": "Target shoe penetration in percent (must be within range: 5-95); actual penetration will vary +/-5%",
         "section": "rules",
         "key": "penetration"
     },
