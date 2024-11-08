@@ -19,12 +19,11 @@ CONFIG = {
     "blackjack_payout": 3 / 2,
     "surrender": True,  # No extra conditions DON'T CHANGE IT, NOT READY YET
     "player_cash": 1_000,
-    "table_min": 5,
-    "table_max": 50,
-    "penetration_min": 75,
-    "penetration_max": 80,  # penetration percentage range (min, max)
+    "table_limits": (5, 50),
+    "penetration": 80,
     "number_of_decks": 6,
 }
+print(f"inside engine: {id(CONFIG)}")
 # ### End-rules ###
 
 SUITS = ["S", "H", "D", "C"]
@@ -120,13 +119,11 @@ class Shoe(list[Card]):
         self.hilo_count = 0
         self.extend([*DECK * self.decks])
         random.shuffle(self)
-        self._cut_card = int(
-            random.randint(
-                100 - CONFIG["penetration_max"], 100 - CONFIG["penetration_min"]
-            )
-            * len(self)
-            / 100
+        penetration_range = (
+            100 - CONFIG["penetration"] - 5,
+            100 - CONFIG["penetration"] + 5,
         )
+        self._cut_card = int(random.randint(*penetration_range) * len(self) / 100)
 
     def deal(self) -> Card:
         card = self.pop()
@@ -404,7 +401,7 @@ class Dealer:
 class Player:
     strategy: GameStrategy | None
     betting_strategy: BettingStrategy
-    cash: float = CONFIG["player_cash"]
+    cash: float = field(default_factory=lambda: CONFIG["player_cash"])
     number_of_hands: int = 1
 
     def charge(self, amount: float) -> float:
@@ -509,9 +506,9 @@ class HandPlay:
         except NotEnoughCash:
             betsize = player.cash
 
-        if betsize > CONFIG["table_min"]:
-            return cls(player, CONFIG["table_max"])
-        elif betsize >= CONFIG["table_min"]:
+        if betsize > CONFIG["table_limits"][1]:
+            return cls(player, CONFIG["table_limits"][1])
+        elif betsize >= CONFIG["table_limits"][0]:
             return cls(player, betsize)
         else:
             # cash that the player has is lower than table minimum
