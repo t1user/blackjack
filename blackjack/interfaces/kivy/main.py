@@ -378,6 +378,8 @@ class Screen(BoxLayout):
     shoe = ObjectProperty()
     count_button = ObjectProperty()
     welcome_screen = ObjectProperty()
+
+    number_of_hands = NumericProperty(1)
     playing_player = None
 
     def __init__(self, config, **kwargs: Any) -> None:
@@ -405,6 +407,18 @@ class Screen(BoxLayout):
         self.bet_size.max_bet = cash
         self.playarea.update()
 
+    def on_number_of_hands(self, _, hands: int):
+        if self.playing_player is not None:
+            self.playing_player.number_of_hands = hands
+
+    def update_npc(self):
+        player_config = dict(self.config["players"])
+        npcs = PlayerFactory(player_config, self.bet_size).npcs
+        assert self.playing_player
+        npcs.insert(1, self.playing_player)
+        players = [player for player in npcs if player]
+        self.game.players = players
+
     def on_decision_widget(self, decision):
         self.buttonstrip.clear_widgets()
         if decision is None or decision.choices is None:
@@ -425,7 +439,6 @@ class Screen(BoxLayout):
         self.game.play()
 
     def start(self, *args) -> Game:
-        print(f"STARTING GAME")
         player_config = dict(self.config["players"])
         print(f"{player_config=}")
         assert player_config is not None
@@ -459,6 +472,10 @@ class PlayerFactory:
     def players(self):
         return self.player_factory()
 
+    @property
+    def npcs(self):
+        return self.npc_factory()
+
     def player_factory(
         self,
     ) -> list[Player]:
@@ -471,7 +488,6 @@ class PlayerFactory:
                 number_of_hands=int(self.config["number_of_hands"]),
             ),
         )
-        print(f"Player cash: {players[1].cash}")
         return [player for player in players if player]
 
     def npc_factory(self) -> list[Player]:
@@ -598,10 +614,15 @@ class BlackjackApp(App):
             if isinstance(result, str):
                 result = eval(result)
             CONFIG[key] = result
+        elif section == "players":
+            if key == "number_of_hands":
+                self.screen.number_of_hands = value
+            else:
+                self.screen.update_npc()
 
-    def close_settings(self, *args, **kwargs):
-        super().close_settings(*args, **kwargs)
-        self.screen.start()
+    # def close_settings(self, *args, **kwargs):
+    #     super().close_settings(*args, **kwargs)
+    #     self.screen.start()
 
 
 if __name__ == "__main__":
