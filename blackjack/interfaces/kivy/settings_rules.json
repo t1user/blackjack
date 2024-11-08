@@ -34,7 +34,7 @@
     },
     {
         "type": "bool",
-        "title": "surrender",
+        "title": "Surrender",
         "desc": "Whether surrender is allowed",
         "section": "rules",
         "key": "surrender"
@@ -61,7 +61,7 @@
     {
         "type": "percent_numeric",
         "title": "Penetration (%)",
-        "desc": "Shoe penetration in percent (5-95); actual penetration will be given value +/-5%",
+        "desc": "Target shoe penetration in percent (5-95); actual penetration will vary +/-5%",
         "section": "rules",
         "key": "penetration"
     },

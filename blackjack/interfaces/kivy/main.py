@@ -425,10 +425,13 @@ class Screen(BoxLayout):
         self.game.play()
 
     def start(self, *args) -> Game:
+        print(f"STARTING GAME")
         player_config = dict(self.config["players"])
+        print(f"{player_config=}")
         assert player_config is not None
         self.bet_size.reset()
         players = PlayerFactory(player_config, self.bet_size).players
+        print(f"{players=}")
         if len(players) == 1 and players[0].number_of_hands == 0:
             players[0].number_of_hands = 1
         self.game = Game(players)
@@ -479,7 +482,15 @@ class PlayerFactory:
             strategy_cls = self._translate_strategy_config(strategy_str)
             if strategy_cls is not None:
                 npc_players.append(
-                    Player(strategy_cls(), strategies.FixedBettingStrategy(25))
+                    Player(
+                        strategy_cls(),
+                        strategies.FixedBettingStrategy(
+                            max(
+                                round(CONFIG["player_cash"] * 0.025, 0),
+                                CONFIG["table_limits"][0],
+                            )
+                        ),
+                    )
                 )
             else:
                 npc_players.append(None)
