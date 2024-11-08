@@ -1,0 +1,75 @@
+[
+    {
+        "type": "numeric",
+        "title": "Max splits",
+        "desc": "Number of times player is allowed to split hand; negative number means no limit",
+        "section": "rules",
+        "key": "max_splits"
+    },
+    {
+        "type": "bool",
+        "title": "Only single card on split aces",
+        "desc": "After splitting double aces only one card will be dealt",
+        "section": "rules",
+        "key": "single_card_on_split_aces"
+    },
+    {
+        "type": "bool",
+        "title": "Resplit aces",
+        "desc": "Double aces can be re-split regardless of other rules",
+        "section": "rules",
+        "key": "resplit_aces"
+    },
+    {
+        "type": "fraction_options",
+        "title": "BlackJack payout",
+        "desc": "BlackJack payout",
+        "section": "rules",
+        "key": "blackjack_payout",
+        "options": [
+            "3/2",
+            "6/5",
+            "1/1"
+        ]
+    },
+    {
+        "type": "bool",
+        "title": "surrender",
+        "desc": "Whether surrender is allowed",
+        "section": "rules",
+        "key": "surrender"
+    },
+    {
+        "type": "positive_numeric",
+        "title": "Player cash",
+        "desc": "Player's initial bankroll",
+        "section": "rules",
+        "key": "player_cash"
+    },
+    {
+        "type": "options",
+        "title": "Table limits",
+        "desc": "Minimum and maximum bet",
+        "section": "rules",
+        "key": "table_limits",
+        "options": [
+            "(5, 50)",
+            "(50, 500)",
+            "(5, 500)"
+        ]
+    },
+    {
+        "type": "percent_numeric",
+        "title": "Penetration (%)",
+        "desc": "Shoe penetration in percent (5-95); actual penetration will be given value +/-5%",
+        "section": "rules",
+        "key": "penetration"
+    },
+    {
+        "type": "positive_numeric",
+        "title": "Number of decks",
+        "desc": "Number of decks in the shoe",
+        "section": "rules",
+        "key": "number_of_decks"
+    }
+]

@@ -1,11 +1,9 @@
-import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Type
+from typing import Any, Callable
 
 from kivy.app import App
-from kivy.config import Config
 from kivy.core.window import Window
 from kivy.graphics import Color, Line
 from kivy.properties import NumericProperty, ObjectProperty
@@ -13,13 +11,14 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.image import Image
 from kivy.uix.label import Label
-from kivy.uix.settings import SettingsWithSidebar
+from kivy.uix.settings import SettingNumeric, SettingOptions, SettingsWithSidebar
 from kivy.uix.slider import Slider
 from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.widget import Widget
 
-from blackjack import engine, strategies
+from blackjack import strategies
 from blackjack.engine import (
+    CONFIG,
     BettingStrategy,
     DecisionHandler,
     Game,
@@ -31,7 +30,6 @@ from blackjack.engine import (
     Round,
     YesNoDecision,
 )
-from blackjack.strategies import FixedBettingStrategy, MimickDealer, RandomStrategy
 
 SIZE_RATIO = 0.65  # percentage of play area over which cards are to be distributed
 IMAGE_HEIGHT_RATIO = 0.15  # image height as proportion of window height
@@ -97,20 +95,23 @@ class InsuranceButtons(BoxLayout):
 
 class KivyBettingStrategy(Slider):
 
-    max_bet = NumericProperty(engine.PLAYER_CASH)
+    max_bet = NumericProperty(CONFIG["player_cash"])
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.min = engine.TABLE_LIMITS[0]
-        self.max = engine.TABLE_LIMITS[1]
-        self.step = self.min
+        self.reset()
 
     def bet(self, *args: Any, **kwargs: Any) -> float:
         self.disabled = True
         return self.value
 
     def on_max_bet(self, *args):
-        self.max = min(engine.TABLE_LIMITS[1], self.max_bet)
+        self.max = min(CONFIG["table_limits"][1], self.max_bet)
+
+    def reset(self):
+        self.min = CONFIG["table_limits"][0]
+        self.max = CONFIG["table_limits"][1]
+        self.step = self.min
 
 
 class DealButton(BoxLayout):
@@ -426,8 +427,8 @@ class Screen(BoxLayout):
     def start(self, *args) -> Game:
         player_config = dict(self.config["players"])
         assert player_config is not None
+        self.bet_size.reset()
         players = PlayerFactory(player_config, self.bet_size).players
-        print(f"players: {players} {len(players)}")
         if len(players) == 1 and players[0].number_of_hands == 0:
             players[0].number_of_hands = 1
         self.game = Game(players)
@@ -467,6 +468,7 @@ class PlayerFactory:
                 number_of_hands=int(self.config["number_of_hands"]),
             ),
         )
+        print(f"Player cash: {players[1].cash}")
         return [player for player in players if player]
 
     def npc_factory(self) -> list[Player]:
@@ -476,7 +478,9 @@ class PlayerFactory:
             assert strategy_str is not None
             strategy_cls = self._translate_strategy_config(strategy_str)
             if strategy_cls is not None:
-                npc_players.append(Player(strategy_cls(), FixedBettingStrategy(25)))
+                npc_players.append(
+                    Player(strategy_cls(), strategies.FixedBettingStrategy(25))
+                )
             else:
                 npc_players.append(None)
         return npc_players
@@ -490,6 +494,51 @@ class PlayerFactory:
         return getattr(strategies, item)
 
 
+class PercentSettingNumeric(SettingNumeric):
+    def _validate(self, instance):
+        text_type = str
+        is_float = "." in str(self.value)
+        self._dismiss()
+        try:
+            if is_float:
+                value = float(self.textinput.text)
+            else:
+                value = int(self.textinput.text)
+            if not (5 <= value <= 95):  # type: ignore
+                raise ValueError
+            self.value = text_type(value)
+        except ValueError:
+            return
+
+
+class PositiveSettingNumeric(SettingNumeric):
+    def _validate(self, instance):
+        text_type = str
+        is_float = "." in str(self.value)
+        self._dismiss()
+        try:
+            if is_float:
+                value = float(self.textinput.text)
+            else:
+                value = int(self.textinput.text)
+            if not 0 < value:
+                raise ValueError
+            self.value = text_type(value)
+        except ValueError:
+            return
+
+
+class FractionSettingOptions(SettingOptions):
+    def _set_option(self, instance):
+        self.value = {"3/2": "1.5", "6/5": str(6 / 5), "1/1": str(1)}.get(instance.text)
+        self.popup.dismiss()
+
+
+rules_types = {key: type(value) for key, value in CONFIG.items()}
+function_dict = {int: "getint", float: "getfloat", bool: "getboolean"}
+root_dir = Path(__file__).parent
+
+
 class BlackjackApp(App):
 
     def build(self):
@@ -500,7 +549,6 @@ class BlackjackApp(App):
         return self.screen
 
     def build_config(self, config):
-        print("BUILD_CONFIG called")
         config.setdefaults(
             "players",
             {
@@ -509,13 +557,36 @@ class BlackjackApp(App):
                 "l_strategy": None,
             },
         )
+        config.setdefaults("rules", CONFIG.copy())
+
+    def load_config(self):
+        config = super().load_config()
+        self.update_config(config)
+        return config
+
+    def update_config(self, config):
+        for key, value in config["rules"].items():
+            self.on_config_change(config, "rules", key, value)
 
     def build_settings(self, settings):
-        with open("blackjack/interfaces/kivy/settings.json", "rt") as settings_json:
-            settings.add_json_panel("Players", self.config, data=settings_json.read())
+        settings.register_type("percent_numeric", PercentSettingNumeric)
+        settings.register_type("fraction_options", FractionSettingOptions)
+        settings.register_type("positive_numeric", PositiveSettingNumeric)
+
+        with open(root_dir / "settings_players.json", "rt") as player_json:
+            settings.add_json_panel("Players", self.config, data=player_json.read())
+
+        with open(root_dir / "settings_rules.json", "rt") as rules_json:
+            settings.add_json_panel("Rules", self.config, data=rules_json.read())
 
     def on_config_change(self, config, section, key, value):
-        pass
+        if section == "rules":
+            method = function_dict.get(rules_types[key], "get")
+            callable = getattr(config, method, "get")
+            result = callable("rules", key)  # type: ignore
+            if isinstance(result, str):
+                result = eval(result)
+            CONFIG[key] = result
 
     def close_settings(self, *args, **kwargs):
         super().close_settings(*args, **kwargs)

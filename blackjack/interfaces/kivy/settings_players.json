@@ -14,7 +14,7 @@
     {
         "type": "options",
         "title": "Right NPC",
-        "desc": "Strategy of Non-Playing Character placed to the right of player.",
+        "desc": "Strategy of Non-Playing Character placed to player's right or None",
         "section": "players",
         "key": "r_strategy",
         "options": [
@@ -26,7 +26,7 @@
     {
         "type": "options",
         "title": "Left NPC",
-        "desc": "Strategy of Non-Playing Character placed to the right of player.",
+        "desc": "Strategy of Non-Playing Character placed to player's left or None",
         "section": "players",
         "key": "l_strategy",
         "options": [
