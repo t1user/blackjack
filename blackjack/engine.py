@@ -26,7 +26,6 @@ CONFIG = {
     "penetration": 80,
     "number_of_decks": 6,
 }
-print(f"inside engine: {id(CONFIG)}")
 # ### End-rules ###
 
 SUITS = ["S", "H", "D", "C"]
@@ -34,13 +33,6 @@ RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
 FACES = ["10", "J", "Q", "K"]
 
 suit_str_dict = {"S": "♠", "H": "♥", "D": "♦", "C": "♣"}
-
-
-class Suit(str, Enum):
-    S = "♠"
-    H = "♥"
-    D = "♦"
-    C = "♣"
 
 
 @dataclass(frozen=True)
@@ -1075,7 +1067,6 @@ class Game:
                 if hand_play is not None:
                     hand_plays.append(hand_play)
         r = Round(self.dealer, TablePlay(hand_plays))
-        print(f"made new round: {r} {id(r)}")
         return r
 
     def play(self) -> Round | None:
