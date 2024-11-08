@@ -1,5 +1,12 @@
 [
     {
+        "type": "bool",
+        "title": "Dealer hits soft 17",
+        "desc": "Whether dealer should stand (standard) or hit (disadvantageous) on soft 17",
+        "section": "rules",
+        "key": "dealer_h17"
+    },
+    {
         "type": "numeric",
         "title": "Max splits",
         "desc": "Number of times player is allowed to split hand; negative number means no limit",
@@ -19,6 +26,25 @@
         "desc": "Double aces can be re-split regardless of other rules",
         "section": "rules",
         "key": "resplit_aces"
+    },
+    {
+        "type": "options",
+        "title": "Double restrictions",
+        "desc": "Double allowed only on specified hard values; None means no restrictions",
+        "section": "rules",
+        "key": "double_restrictions",
+        "options": [
+            "(9, 10)",
+            "(9, 10, 11)",
+            "None"
+        ]
+    },
+    {
+        "type": "bool",
+        "title": "Double after split",
+        "desc": "Whether double is allowed after split; other double restrictions hold",
+        "section": "rules",
+        "key": "double_after_split"
     },
     {
         "type": "fraction_options",

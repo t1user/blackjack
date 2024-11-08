@@ -12,9 +12,11 @@ from .helpers import PubSubDecorator
 
 # ### Rules ###
 CONFIG = {
+    "dealer_h17": False,
     "max_splits": -1,  # negative number means no limit
     "single_card_on_split_aces": True,
     "resplit_aces": True,
+    "double_restrictions": (),
     "double_after_split": True,
     "blackjack_payout": 3 / 2,
     "surrender": True,  # No extra conditions DON'T CHANGE IT, NOT READY YET
@@ -335,11 +337,28 @@ class DealerStrategy:
         return f"{self.__class__.__qualname__}()"
 
 
+class DealerStrategyH17(DealerStrategy):
+
+    def play(self, dealer_hand: Hand, *args) -> PlayDecision:  # type: ignore
+        return (
+            PlayDecision.HIT
+            if (dealer_hand.value < 17 or dealer_hand.soft_value == 17)
+            else PlayDecision.STAND
+        )
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__qualname__}()"
+
+
+def dealer_config_factory() -> DealerStrategy:
+    return DealerStrategyH17() if CONFIG["dealer_h17"] else DealerStrategy()
+
+
 @dataclass
 class Dealer:
     shoe: Shoe = field(default_factory=partial(Shoe, CONFIG["number_of_decks"]))
     hand: Hand = field(default_factory=Hand)
-    strategy: DealerStrategy = DealerStrategy()
+    strategy: DealerStrategy = field(default_factory=dealer_config_factory)
 
     def deal(self, hand: Hand | HandPlay) -> None:
         hand += self.shoe.deal()
@@ -736,6 +755,10 @@ class HandPlay:
         if self.player.cash < self.betsize:
             return False
         elif (not CONFIG["double_after_split"]) and self.splits:
+            return False
+        elif CONFIG["double_restrictions"] and (
+            self.hand.hard_value not in CONFIG["double_restrictions"]
+        ):
             return False
         else:
             return len(self.hand) == 2
