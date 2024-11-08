@@ -932,13 +932,14 @@ class Round:
             except StopIteration:
                 next_step = self.finalize
 
-            if (gen := func(self)) is None:
+            if (gen := func(self)) is State.DONE:
+                return self
+            elif gen is None:
                 return next_step()
+            elif DecisionHandler.from_gen(gen, next_step):
+                return
             else:
-                if DecisionHandler.from_gen(gen, next_step):
-                    return
-                else:
-                    return next_step()
+                return next_step()
 
         return wrapper
 
@@ -968,7 +969,9 @@ class Round:
         return first_step()
 
     @step
-    def shuffle(self) -> None:
+    def shuffle(self) -> None | State:
+        if not self.table.hands:
+            return State.DONE
         self.dealer.shuffle()
 
     @step
