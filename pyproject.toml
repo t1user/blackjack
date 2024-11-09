@@ -32,9 +32,11 @@ dev = [
 packages = ["blackjack"]
 
 [project.urls]
-Repository = "https://github.com/t1user/bj"
+Repository = "https://github.com/t1user/blackjack"
 
-# [project.scripts]
+[project.scripts]
+kivy_game = "blackjack.interfaces.kivy.main:run"
+text_game = "blackjack.interfaces.text:run"
 
 [tool.setuptools_scm]
 version_file = "blackjack/_version.py"

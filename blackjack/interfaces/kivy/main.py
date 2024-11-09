@@ -616,5 +616,9 @@ class BlackjackApp(App):
                 self.screen.update_npc()
 
 
-if __name__ == "__main__":
+def run():
     BlackjackApp().run()
+
+
+if __name__ == "__main__":
+    run()
