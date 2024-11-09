@@ -3,7 +3,7 @@ from functools import wraps
 from typing import Any, Callable, ClassVar, Literal
 
 from blackjack.engine import (
-    TABLE_LIMITS,
+    CONFIG,
     Game,
     Hand,
     NotEnoughCash,
@@ -120,7 +120,8 @@ class TextBettingStrategy(BettingStrategy):
         while True:
             i = (
                 input(
-                    f'"Q" to quit; Enter BET ({TABLE_LIMITS[0]}-{TABLE_LIMITS[1]})'
+                    f'"Q" to quit; Enter BET ({CONFIG['table_limits'][0]}-'
+                    f"{CONFIG['table_limits'][1]})"
                     f" or [Enter] for: {self.betsize} -> "
                 )
                 .upper()
@@ -135,7 +136,9 @@ class TextBettingStrategy(BettingStrategy):
                 print(f"{i} is not a number, try again...")
                 continue
 
-            self.betsize = max(min(float(i), TABLE_LIMITS[1]), TABLE_LIMITS[0])
+            self.betsize = max(
+                min(float(i), CONFIG["table_limits"][1]), CONFIG["table_limits"][0]
+            )
             print(f"BET: {self.betsize}")
             return self.betsize
 
@@ -182,7 +185,11 @@ class TextGame(Game):
             return "PUSH"
 
 
-if __name__ == "__main__":
+def run():
     game = TextGame([Player(TextGameStrategy(), TextBettingStrategy(5))])
     print("---> W E L C O M E  T O  B L A C K J A C K <---")
     game.loop_play()
+
+
+if __name__ == "__main__":
+    run()
