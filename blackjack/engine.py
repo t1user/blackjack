@@ -16,14 +16,14 @@ CONFIG = {
     "max_splits": -1,  # negative number means no limit
     "single_card_on_split_aces": True,
     "resplit_aces": True,
-    "double_restrictions": (),
+    "double_restrictions": (),  # tuple of hard values where double allowed
     "double_after_split": True,
     "any_tens_split": True,
     "blackjack_payout": 3 / 2,
-    "surrender": True,  # No extra conditions DON'T CHANGE IT, NOT READY YET
+    "surrender": True,
     "player_cash": 1_000,
-    "table_limits": (5, 50),
-    "penetration": 80,
+    "table_limits": (5, 50),  # typle (min, max)
+    "penetration": 80,  # in percent
     "number_of_decks": 6,
 }
 # ### End-rules ###
@@ -447,8 +447,8 @@ class PlayDecision(Flag):
     HIT = auto()
     SPLIT = auto()
     DOUBLE = auto()
-    STAND = auto()
     SURRENDER = auto()
+    STAND = auto()
 
     @classmethod
     def from_predicates(
@@ -461,6 +461,10 @@ class PlayDecision(Flag):
     @classmethod
     def all(cls):
         return reduce(ior, [flag for flag in cls])
+
+    @classmethod
+    def no_surrender(cls):
+        return cls.from_predicates((True, True, True, False, True))
 
 
 class YesNoDecision(Flag):
@@ -570,8 +574,8 @@ class HandPlay:
                 self.can_hit(),
                 self.can_split(),
                 self.can_double(),
-                self.can_stand(),
                 self.can_surrender(),
+                self.can_stand(),
             )
             if any(predicates):
                 return PlayDecision.from_predicates(predicates)

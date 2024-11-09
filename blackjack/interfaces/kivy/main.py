@@ -1,4 +1,3 @@
-import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -31,8 +30,8 @@ from blackjack.engine import (
     YesNoDecision,
 )
 
-SIZE_RATIO = 0.65  # percentage of play area over which cards are to be distributed
-IMAGE_HEIGHT_RATIO = 0.15  # image height as proportion of window height
+SIZE_RATIO = 0.55  # percentage of play area over which cards are to be distributed
+IMAGE_HEIGHT_RATIO = 0.3  # image height as proportion of window height
 
 
 class CountButton(ToggleButton):
@@ -64,7 +63,9 @@ class DecisionButtons(BoxLayout):
     def __init__(self, callable: Callable, choices: PlayDecision, Hand, **kwargs):
         super().__init__(**kwargs)
         self.callable = callable
-        for action in PlayDecision:
+        for action in (
+            PlayDecision if CONFIG["surrender"] else PlayDecision.no_surrender()
+        ):
             self.add_widget(
                 PlayDecisionButton(action, disabled=not (action in choices))
             )
@@ -115,10 +116,6 @@ class KivyBettingStrategy(Slider):
 
 
 class DealButton(BoxLayout):
-    pass
-
-
-class TextLabel(Label):
     pass
 
 
@@ -356,11 +353,11 @@ class PlayArea(Widget):
         dealer is always at position -0.5
         """
         assert -1 <= t <= 1
-        height = SIZE_RATIO * self.height / 2
-        width = SIZE_RATIO * self.width / 2
+        height = SIZE_RATIO * Window.height / 2
+        width = SIZE_RATIO * Window.width / 2
         t_ = abs(t)
         x = width - 2 * (t_ * width)
-        y = -height / width * math.sqrt(width**2 - x**2)
+        y = -height / width * (width**2 - x**2) ** 0.5
         if t < 0:
             y = -y
         return self.offset(x, y)
@@ -401,7 +398,7 @@ class Screen(BoxLayout):
         self.shoe.text = (
             f"DECKS: "
             f"{(len(shoe)-shoe._cut_card)/52:.1f} "
-            f"{"SHUFFLE" if shoe.will_shuffle else ""}"
+            f"{'SHUFFLE' if shoe.will_shuffle else ''}"
         )
         self.bet_size.max_bet = cash
         self.playarea.update()
@@ -568,7 +565,7 @@ class BlackjackApp(App):
 
     def build(self):
         self.settings_cls = SettingsWithSidebar
-        self.use_kivy_settings = False
+        # self.use_kivy_settings = False
         self.screen = Screen(self.config)
         # Clock.schedule_interval(self.screen.update, 0.25)
         return self.screen
@@ -617,10 +614,6 @@ class BlackjackApp(App):
                 self.screen.on_number_of_hands(int(value))
             else:
                 self.screen.update_npc()
-
-    # def close_settings(self, *args, **kwargs):
-    #     super().close_settings(*args, **kwargs)
-    #     self.screen.start()
 
 
 if __name__ == "__main__":

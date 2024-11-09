@@ -1,6 +1,7 @@
 import pytest
 
 from blackjack.engine import (
+    CONFIG,
     DECK,
     Card,
     Dealer,
@@ -438,6 +439,7 @@ class TestHandPlay:
 
     @pytest.fixture
     def hand_play(self, random_player: Player):
+        CONFIG["surrender"] = True
         return HandPlay.from_player(random_player)
 
     @pytest.fixture
@@ -448,8 +450,8 @@ class TestHandPlay:
     # HIT: 1
     # SPLIT: 2
     # DOUBLE: 4
-    # STAND: 8
-    # SURRENDER: 16
+    # SURRENDER: 8
+    # STAND: 16
     # value of allowed_choices is the numerical sum of available options
 
     def test_double_aces_can_split(self, hand_play: HandPlay):
@@ -461,7 +463,7 @@ class TestHandPlay:
         hand_play += Card("A", "H")
         hand_play += Card("A", "S")
         hand_play += Card("K", "H")
-        assert hand_play.allowed_choices.value == 9  # type: ignore
+        assert hand_play.allowed_choices.value == 17  # type: ignore
 
     def test_non_pair_cannot_split(self, hand_play: HandPlay):
         hand_play += Card("A", "S")
