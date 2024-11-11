@@ -11,10 +11,24 @@ class RandomStrategy(GameStrategy):
     def play(
         self, dealer_hand: Hand, player_hand: Hand, choices: PlayDecision
     ) -> PlayDecision:
-        return random.choice(list(choices))
+        return (
+            PlayDecision.STAND
+            if player_hand.value >= 20
+            else random.choice(list(choices))
+        )
 
     def insurance(self, dealer_hand: Hand, player_hand: Hand) -> YesNoDecision:
         return random.choice(list(YesNoDecision))
+
+
+class StayOnEleven(GameStrategy):
+    def play(
+        self, dealer_hand: Hand, player_hand: Hand, choices: PlayDecision
+    ) -> PlayDecision:
+        return PlayDecision.STAND if player_hand.hard_value > 11 else PlayDecision.HIT
+
+    def insurance(self, dealer_hand: Hand, player_hand: Hand) -> YesNoDecision:
+        return YesNoDecision.YES
 
 
 class MimickDealer(GameStrategy):
@@ -22,7 +36,7 @@ class MimickDealer(GameStrategy):
     def play(
         self, dealer_hand: Hand, player_hand: Hand, choices: PlayDecision
     ) -> PlayDecision:
-        return PlayDecision.HIT if player_hand.value < 18 else PlayDecision.STAND
+        return PlayDecision.HIT if player_hand.soft_value < 18 else PlayDecision.STAND
 
     def insurance(self, dealer_hand: Hand, player_hand: Hand) -> YesNoDecision:
         return YesNoDecision.NO
