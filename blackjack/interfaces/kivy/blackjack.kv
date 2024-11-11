@@ -36,7 +36,13 @@
             size_hint_x: .125       
         Label:
             id: placeholder
-            size_hint_x: .275
+            size_hint_x: .125
+        Button:
+            size_hint_x: .1
+            on_release: app.open_settings()
+            text: "SET"
+            font_size: root.width * .025
+
         Button:
             text: "RESTART"
             size_hint_x: .15
@@ -44,20 +50,13 @@
             background_normal:''
             background_color: 1, 0, 0
             on_release: root.start()
-        Button:
-            size_hint_x: .05
-            on_release: app.open_settings()
-            Image: 
-                source: "hamburger_icon_white.png"
-                center_x: self.parent.center_x
-                center_y: self.parent.center_y
             
     PlayArea:
         id: playarea
         size_hint_y: .8
         canvas.before:
             Rectangle:
-                source: "felt.jpg"
+                source: self.felt_image
                 pos: self.pos
                 size: self.size
         on_size: self.update()
@@ -79,12 +78,14 @@
             padding: [5, 5, 5, 5]
             DealButton  
 
-
 <DealButton>:
-    Button:
-        size_hint_x: .7
-        text: 'DEAL'
-        on_release: app.screen.play()
+    size_hint_x: .7
+    text: 'DEAL'
+    on_release: app.screen.play()
+    font_size: self.height*.3
+
+<PlayDecisionButton>:
+    font_size: self.height*.3
 
 <YesNoButton>:
     size_hint_x: .25
@@ -94,20 +95,11 @@
     padding: [40, 1, 40, 1]
     Label:
         size_hint_x: .5
-
+        font_size: self.height*.3
 
 <KivyBettingStrategy>:
     
-
-<WelcomeScreen>:
-    title: 'Welcome!'
-    title_align: 'center'
-    size_hint: .5, .5
-    Label:
-        text: "BlackJack"
-
-
-<RotatedImage>:
+<RotatedCardImage>:
     canvas.before:
         PushMatrix
         Rotate:
@@ -116,6 +108,5 @@
             origin: root.center
     canvas.after:
         PopMatrix
-
 
 

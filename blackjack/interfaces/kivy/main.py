@@ -3,9 +3,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 from kivy.app import App
-from kivy.core.window import Window
 from kivy.graphics import Color, Line
-from kivy.properties import NumericProperty, ObjectProperty
+from kivy.properties import NumericProperty, ObjectProperty, StringProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.image import Image
@@ -19,6 +18,7 @@ from blackjack import strategies
 from blackjack.engine import (
     CONFIG,
     BettingStrategy,
+    Card,
     DecisionHandler,
     Game,
     GameStrategy,
@@ -30,11 +30,18 @@ from blackjack.engine import (
     YesNoDecision,
 )
 
-SIZE_RATIO = 0.55  # percentage of play area over which cards are to be distributed
-IMAGE_HEIGHT_RATIO = 0.3  # image height as proportion of window height
+root_dir = Path(__file__).parent
+
+SIZE_RATIO = 0.65  # percentage of play area over which cards are to be distributed
+HORIZONTAL_STRETCH = 1.25  # ratio by which card ellipse is to be stretched horizontally
+IMAGE_HEIGHT_RATIO = 0.26  # image height as proportion of window height
 
 
 class CountButton(ToggleButton):
+    """
+    This is the button that reveals and hides current count. It's defined in kv.
+    """
+
     count = NumericProperty(0.0)
 
     def on_count(self, *args):
@@ -58,6 +65,10 @@ class PlayDecisionButton(Button):
 
 
 class DecisionButtons(BoxLayout):
+    """
+    Holder of buttons through which player makes play decisions about a hand.
+    """
+
     decision = ObjectProperty()
 
     def __init__(self, callable: Callable, choices: PlayDecision, Hand, **kwargs):
@@ -115,11 +126,20 @@ class KivyBettingStrategy(Slider):
         self.step = self.min
 
 
-class DealButton(BoxLayout):
+class DealButton(Button):
+    # defined in kv
     pass
 
 
-class RotatedImage(Image):
+class CardImage(Image):
+    def __init__(self, card: Card, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.source = f"{root_dir}/cards/{card.rank.lower()}_{card.suit.lower()}.png"
+        self.width = self.height / 1.452  # this is the ratio of actual image file
+
+
+class RotatedCardImage(CardImage):
+    # defined in kv
     angle = NumericProperty(90)
 
 
@@ -127,16 +147,15 @@ class HandWidget(Widget):
 
     _offset = 0.15, 0.15
 
-    def __init__(self, pos: tuple[float, float], hand: Hand, **kwargs) -> None:
+    def __init__(
+        self, image_height: float, pos: tuple[float, float], hand: Hand, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
+        self.image_height = image_height
         self.center = pos
         self.hand = hand
         if len(self.hand) > 0:
             self.render()
-
-    @property
-    def image_height(self):
-        return Window.height * IMAGE_HEIGHT_RATIO
 
     @property
     def offset(self):
@@ -148,17 +167,17 @@ class HandWidget(Widget):
     def render(self):
         for i, card in enumerate(self.hand):
             self.add_widget(
-                image := Image(
-                    source=f"cards/{card.rank.lower()}_{card.suit.lower()}.png",
-                    center=self._offset_position(i),
+                image := CardImage(
+                    card,
                     height=self.image_height,
+                    center=self._offset_position(i),
                 )
             )
         self.add_widget(
             Label(
-                text=self.points_value_str(),
+                text=self.hand.value_str(),
                 center=self._label_position(image, i),
-                font_size=self.image_height * 0.2,
+                font_size=self.image_height * 0.15,
             )
         )
 
@@ -169,25 +188,23 @@ class HandWidget(Widget):
         )
 
     def _label_position(self, image: Image, n=0):
-        # return self._offset_position(n - 1)[0], image.top + 10
-        return image.center[0], image.top + image.height * 0.15
-
-    def points_value_str(self):
-        return self.hand.value_str()
+        return image.center[0], image.top + image.height * 0.1
 
 
 class PlayerHand(HandWidget):
 
-    _offset = 0.15, 0.15
+    _offset = 0.125, 0.125
 
     def __init__(
         self,
+        image_height: float,
         pos: tuple[float, float],
         hand_play: HandPlay,
         active: bool = False,
         **kwargs,
     ) -> None:
         Widget.__init__(self, **kwargs)
+        self.image_height = image_height
         self.center = pos
         self.hand = hand_play.hand
         self.hand_play = hand_play
@@ -197,7 +214,7 @@ class PlayerHand(HandWidget):
             with self.canvas.before:  # type: ignore
                 Color(1, 0, 0)  # Set color to red
                 self.frame = Line(
-                    rectangle=self.get_bounding_box(), width=1
+                    rectangle=self.get_bounding_box(), width=2
                 )  # Draw the red frame
                 self.bind(pos=self.update_frame, size=self.update_frame)  # type: ignore
 
@@ -221,7 +238,7 @@ class PlayerHand(HandWidget):
             max_x, max_y = max(max_x, child_max_x), max(max_y, child_max_y)
 
         # Return bounding box coordinates
-        return (min_x, min_y * 0.9, max_x - min_x, max_y * 1.15 - min_y)
+        return (min_x * 0.975, min_y * 0.9, max_x * 1.05 - min_x, max_y * 1.15 - min_y)
 
     def update_frame(self, *args):
         # Update frame to match the computed bounding box
@@ -236,32 +253,39 @@ class PlayerHand(HandWidget):
             last_card = new_hand.pop()
             for i, card in enumerate(new_hand):
                 self.add_widget(
-                    image := Image(
-                        source=f"cards/{card.rank.lower()}_{card.suit.lower()}.png",
-                        center=self._offset_position(i),
+                    image := CardImage(
+                        card,
                         height=self.image_height,
+                        center=self._offset_position(i),
                     )
                 )
             self.add_widget(
-                image := RotatedImage(
-                    source=f"cards/{last_card.rank.lower()}_{last_card.suit.lower()}.png",
-                    center=self._offset_position(i + 1),
+                rotated_image := RotatedCardImage(
+                    last_card,
                     height=self.image_height,
+                    center=(
+                        self._offset_position(i + 2.1)[0],
+                        self._offset_position(i + 1.25)[1],
+                    ),
                 )
             )
             self.add_widget(
                 Label(
-                    text=self.points_value_str(),
-                    center=self._label_position(image, i),
-                    font_size=self.image_height * 0.2,
+                    text=self.hand.value_str(),
+                    center=(rotated_image.center[0], self._label_position(image, i)[1]),
+                    font_size=self.image_height * 0.15,
                 )
             )
         self.add_widget(
             Label(
                 text=self.result_str(),
                 color=(1, 0, 0) if self.hand_play.result < 0 else (0, 1, 0),
-                center=(self.center_x, self.top - self.height * 1.1),
-                font_size=self.image_height * 0.2,
+                center=(
+                    self.center_x,
+                    self.children[-1].top - self.image_height * 1.075,
+                ),
+                font_size=self.image_height * 0.15,
+                font_name="data/fonts/Roboto-Bold.ttf",
             )
         )
 
@@ -300,6 +324,19 @@ class DealerHand(HandWidget):
 class PlayArea(Widget):
     playerhands: list[HandPlay] = []
     dealercards: Hand = Hand()
+    felt_image = StringProperty(f"{root_dir}/felt.jpg")
+    size_shrinker = 1
+
+    def on_size(self, *args):
+        self.update()
+
+    @property
+    def image_height(self):
+        return (
+            IMAGE_HEIGHT_RATIO * self.height
+            if len(self.playerhands) < 8
+            else IMAGE_HEIGHT_RATIO * self.height * 0.8
+        )
 
     def update(self, *args):
         self.clear_widgets()
@@ -314,7 +351,13 @@ class PlayArea(Widget):
         ):
             position = self.get_position(position_index)
             active = hand.active if len(self.playerhands) > 1 else False
-            hand_widget = PlayerHand(position, hand, active)
+            hand_widget = PlayerHand(self.image_height, position, hand, active)
+            self.add_widget(hand_widget)
+
+    def dealer_hand(self) -> None:
+        if self.dealercards:
+            position = self.get_position(-0.5)
+            hand_widget = DealerHand(self.image_height, position, self.dealercards)
             self.add_widget(hand_widget)
 
     def get_player_position_indexes(self, n: int):
@@ -340,12 +383,6 @@ class PlayArea(Widget):
             i += round(1 / (n - 1), 2)
             counter += 1
 
-    def dealer_hand(self) -> None:
-        if self.dealercards:
-            position = self.get_position(-0.5)
-            hand_widget = DealerHand(position, self.dealercards)
-            self.add_widget(hand_widget)
-
     def get_position(self, t):
         """Return position coordinates on an ellipse for a position index t.
         t must be in the range <-1,1>.
@@ -353,8 +390,8 @@ class PlayArea(Widget):
         dealer is always at position -0.5
         """
         assert -1 <= t <= 1
-        height = SIZE_RATIO * Window.height / 2
-        width = SIZE_RATIO * Window.width / 2
+        height = SIZE_RATIO * self.height / 2
+        width = HORIZONTAL_STRETCH * SIZE_RATIO * self.width / 2
         t_ = abs(t)
         x = width - 2 * (t_ * width)
         y = -height / width * (width**2 - x**2) ** 0.5
@@ -363,7 +400,8 @@ class PlayArea(Widget):
         return self.offset(x, y)
 
     def offset(self, x, y):
-        return self.center[0] + x, self.center[1] + y
+        # center is offset to the left and up
+        return self.center[0] * 0.95 + x, self.center[1] * 1.025 + y
 
 
 class Screen(BoxLayout):
@@ -558,7 +596,6 @@ class FractionSettingOptions(SettingOptions):
 
 rules_types = {key: type(value) for key, value in CONFIG.items()}
 function_dict = {int: "getint", float: "getfloat", bool: "getboolean"}
-root_dir = Path(__file__).parent
 
 
 class BlackjackApp(App):
