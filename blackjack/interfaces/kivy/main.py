@@ -1,11 +1,9 @@
 from dataclasses import dataclass
 from pathlib import Path
-from tkinter.tix import IMAGE
 from typing import Any, Callable
 
 from kivy.app import App
 from kivy.graphics import Color, Line
-from kivy.metrics import dp
 from kivy.properties import NumericProperty, ObjectProperty, StringProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
