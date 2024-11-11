@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 from pathlib import Path
+from tkinter.tix import IMAGE
 from typing import Any, Callable
 
 from kivy.app import App
 from kivy.graphics import Color, Line
+from kivy.metrics import dp
 from kivy.properties import NumericProperty, ObjectProperty, StringProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -32,16 +34,17 @@ from blackjack.engine import (
 
 root_dir = Path(__file__).parent
 
-# this is the only number you should change
-# 1 is the middle ground that should be acceptable on all devices
-# for size optimization, use:
-# 0.8-1.0 on desktop, and
-# 1.0-1.2 on mobile
-MAGNIFICATION = 1.2
+# percentage of play area over which cards are to be distributed
+SIZE_RATIO = 0.65
 
-SIZE_RATIO = 0.65  # percentage of play area over which cards are to be distributed
-HORIZONTAL_STRETCH = 1.25  # ratio by which card ellipse is to be stretched horizontally
-IMAGE_HEIGHT_RATIO = 0.26 * MAGNIFICATION  # image height as proportion of window height
+# ratio by which card ellipse is to be stretched horizontally
+HORIZONTAL_STRETCH = 1.225
+
+# image height as proportion of playarea hight
+IMAGE_HEIGHT_RATIO = 0.26
+
+# this is the ratio of actual image file
+IMAGE_HEIGHT_WIDTH_RATIO = 1.452
 
 
 class CountButton(ToggleButton):
@@ -142,12 +145,16 @@ class CardImage(Image):
     def __init__(self, card: Card, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.source = f"{root_dir}/cards/{card.rank.lower()}_{card.suit.lower()}.png"
-        self.width = self.height / 1.452  # this is the ratio of actual image file
+        self.width = self.height / IMAGE_HEIGHT_WIDTH_RATIO
 
 
 class RotatedCardImage(CardImage):
     # defined in kv
     angle = NumericProperty(90)
+
+
+class InsuranceLabel(Label):
+    pass
 
 
 class HandWidget(Widget):
@@ -245,7 +252,12 @@ class PlayerHand(HandWidget):
             max_x, max_y = max(max_x, child_max_x), max(max_y, child_max_y)
 
         # Return bounding box coordinates
-        return (min_x * 0.975, min_y * 0.9, max_x * 1.05 - min_x, max_y * 1.15 - min_y)
+        return (
+            min_x - self.image_height * 0.05,
+            min_y - self.image_height * 0.20,
+            max_x - min_x + 2 * self.image_height * 0.05,
+            max_y - min_y + 2 * self.image_height * 0.20,
+        )
 
     def update_frame(self, *args):
         # Update frame to match the computed bounding box
@@ -253,6 +265,7 @@ class PlayerHand(HandWidget):
         self.frame.rectangle = bbox
 
     def render(self):
+
         if not self.hand_play.doubled:
             super().render()
         else:
@@ -295,6 +308,27 @@ class PlayerHand(HandWidget):
                 font_name="data/fonts/Roboto-Bold.ttf",
             )
         )
+        self.add_widget(
+            Label(
+                text=f"${self.hand_play.betsize:.0f}",
+                center=(
+                    self.center[0] - self.size[0] / 2 - self.offset[1] * 1.5,
+                    self.center[1],
+                ),
+                font_size=self.image_height * 0.15,
+            )
+        )
+        if self.hand_play.insurance:
+            self.add_widget(
+                InsuranceLabel(
+                    text="I",
+                    center=(
+                        self.center[0] - self.size[0] / 2 - self.offset[1] * 1.5,
+                        self.center[1] + self.image_height / 2,
+                    ),
+                    font_size=self.image_height * 0.2,
+                )
+            )
 
     def result_str(self) -> str:
         if not self.hand_play._is_cashed:
@@ -408,7 +442,7 @@ class PlayArea(Widget):
 
     def offset(self, x, y):
         # center is offset to the left and up
-        return self.center[0] * 0.95 + x, self.center[1] * 1.025 + y
+        return self.center[0] + x, self.center[1] * 1.025 + y
 
 
 class Screen(BoxLayout):

@@ -71,15 +71,14 @@
         Label:
             text: '${:,.0f}'.format(bet_size.value)
             font_size: root.width * 0.035
-            size_hint_x: .05
+            size_hint_x: .1
         BoxLayout:
             id: buttonstrip
-            size_hint_x: .75
+            size_hint_x: .7
             padding: [5, 5, 5, 5]
             DealButton  
 
 <DealButton>:
-    size_hint_x: .7
     text: 'DEAL'
     on_release: app.screen.play()
     font_size: self.height*.4
@@ -97,7 +96,7 @@
         size_hint_x: .5
         font_size: self.height*.4
 
-<KivyBettingStrategy>:
+<KivyBettingStrategy>:           
     
 <RotatedCardImage>:
     canvas.before:
@@ -109,4 +108,12 @@
     canvas.after:
         PopMatrix
 
+
+<InsuranceLabel>:
+    canvas.before:
+        Color:
+            rgba: 0, 1, 0, 1 
+        Ellipse:
+            pos: self.center[0] - max(self.texture_size)/2, self.center[1] - max(self.texture_size)/2
+            size: max(self.texture_size), max(self.texture_size)
 
