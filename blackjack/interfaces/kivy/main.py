@@ -32,9 +32,16 @@ from blackjack.engine import (
 
 root_dir = Path(__file__).parent
 
+# this is the only number you should change
+# 1 is the middle ground that should be acceptable on all devices
+# for size optimization, use:
+# 0.8-1.0 on desktop, and
+# 1.0-1.2 on mobile
+MAGNIFICATION = 1.2
+
 SIZE_RATIO = 0.65  # percentage of play area over which cards are to be distributed
 HORIZONTAL_STRETCH = 1.25  # ratio by which card ellipse is to be stretched horizontally
-IMAGE_HEIGHT_RATIO = 0.26  # image height as proportion of window height
+IMAGE_HEIGHT_RATIO = 0.26 * MAGNIFICATION  # image height as proportion of window height
 
 
 class CountButton(ToggleButton):
@@ -602,9 +609,8 @@ class BlackjackApp(App):
 
     def build(self):
         self.settings_cls = SettingsWithSidebar
-        # self.use_kivy_settings = False
+        self.use_kivy_settings = False
         self.screen = Screen(self.config)
-        # Clock.schedule_interval(self.screen.update, 0.25)
         return self.screen
 
     def build_config(self, config):
@@ -648,7 +654,7 @@ class BlackjackApp(App):
             CONFIG[key] = result
         elif section == "players":
             if key == "number_of_hands":
-                self.screen.on_number_of_hands(int(value))
+                self.screen.on_number_of_hands(int(value))  # type: ignore
             else:
                 self.screen.update_npc()
 
