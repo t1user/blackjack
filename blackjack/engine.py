@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from enum import Enum, Flag, auto
 from functools import cached_property, partial, reduce, wraps
 from operator import ior
-from typing import Any, Callable, ClassVar, Generator, Generic, Self, TypeVar
+from typing import Any, Callable, ClassVar, Generator, Generic, Self, Sequence, TypeVar
 
 from .helpers import PubSubDecorator
 
@@ -483,18 +483,17 @@ class State(Enum):
 
 D = TypeVar("D", YesNoDecision, PlayDecision)
 
+type R = Sequence[HandPlay] | HandPlay | State
+
 
 @dataclass
 class Decision(Generic[D]):
-    callable: Callable[[D], list[Self] | Self | State]
-    options: D
+    callable: Callable[[D], R]
+    choices: D
     hand: Hand
 
-    def __iter__(self):
-        return iter((self.callable, self.options, self.hand))
-
-    def __call__(self, *args, **kwargs) -> list[Self] | Self | State:
-        return self.callable(*args, **kwargs)
+    def __call__(self, decision: D) -> R:
+        return self.callable(decision)
 
 
 @dataclass
@@ -639,7 +638,7 @@ class HandPlay:
             self.insurance = 0.5 * self.betsize
         return State.DONE
 
-    def play(self, dealer: Dealer) -> list[Self] | Self | State | Decision:
+    def play(self, dealer: Dealer) -> R | Decision:
         if self.allowed_choices is None:
             return State.DONE
         if self.player.strategy is None:
@@ -652,9 +651,7 @@ class HandPlay:
                 self.player.strategy.play(dealer.hand, self.hand, self.allowed_choices),
             )
 
-    def process_decision(
-        self, dealer: Dealer, decision: PlayDecision
-    ) -> list[Self] | Self | State:
+    def process_decision(self, dealer: Dealer, decision: PlayDecision) -> R:
         try:
             assert self.allowed_choices is not None
             assert decision in self.allowed_choices
@@ -683,7 +680,7 @@ class HandPlay:
         self.done()
         return State.DONE
 
-    def split(self, dealer: Dealer) -> list[Self]:
+    def split(self, dealer: Dealer) -> Sequence[Self]:
         self.charge_bet()
         is_done = (
             True
@@ -790,7 +787,7 @@ class HandPlay:
         splits: int,
         insurance: float,
         **kwargs: Any,
-    ) -> list[Self]:
+    ) -> Sequence[Self]:
         new_hands = [
             cls(player, bet_size, Hand.from_split(card), splits=splits + 1, **kwargs)
             for card in reversed(hand)
@@ -894,7 +891,9 @@ class DecisionHandler:
 
         self._decision_callable: Decision | None = None
 
-        self.decision_function, self.choices, self.hand = decision
+        self.decision_function = decision.callable
+        self.choices = decision.choices
+        self.hand = decision.hand
         self.make_callable()
 
     @property
@@ -915,13 +914,13 @@ class DecisionHandler:
         else:
             return cls(gen, next_step, decision_tuple)
 
-    def __call__(self, decision: PlayDecision | YesNoDecision) -> None:
+    def __call__(self, decision: D) -> None:
         assert self.decision_callable is not None
         self.decision_callable(decision)
 
     def make_callable(self):
 
-        def inner(decision: PlayDecision | YesNoDecision):
+        def inner(decision: D) -> None:
             self.choices = None
             self.decision_callable = None
             try:
@@ -929,7 +928,9 @@ class DecisionHandler:
             except StopIteration:
                 self.next_step()
             else:
-                self.decision_function, self.choices, self.hand = next_decision_tuple
+                self.decision_function = next_decision_tuple.callable
+                self.choices = next_decision_tuple.choices
+                self.hand = next_decision_tuple.hand
                 self.make_callable()
 
         self.decision_callable = inner
