@@ -6,7 +6,17 @@ from dataclasses import dataclass, field
 from enum import Enum, Flag, auto
 from functools import cached_property, partial, reduce, wraps
 from operator import ior
-from typing import Any, Callable, ClassVar, Generator, Generic, Self, Sequence, TypeVar
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Generator,
+    Generic,
+    Literal,
+    Self,
+    Sequence,
+    TypeVar,
+)
 
 from .helpers import PubSubDecorator
 
@@ -477,6 +487,10 @@ class YesNoDecision(Flag):
 
 
 class State(Enum):
+    """
+    Indication wheather player has made the final decision about a hand.
+    """
+
     DONE = auto()
     NOT_DONE = auto()
 
@@ -515,6 +529,7 @@ class HandPlay:
     _winnings: float = field(default=0, repr=False)
     _losses: float = field(default=0, repr=False)
     _is_cashed: bool = field(default=False, repr=True)
+    insurance_result: Literal[-1, 0, 1] = field(default=0, repr=False)
 
     def __post_init__(self):
         self._losses = -self.betsize
@@ -712,8 +727,12 @@ class HandPlay:
         return State.DONE
 
     def eval_insurance(self, dealer: Dealer) -> State:
-        if self.insurance and dealer.hand.is_blackjack():
-            self.credit(self.insurance * 3)
+        if self.insurance:
+            if dealer.hand.is_blackjack():
+                self.credit(self.insurance * 3)
+                self.insurance_result = 1
+            else:
+                self.insurance_result = -1
         return State.DONE
 
     def eval_hand(self, dealer: Dealer) -> State:

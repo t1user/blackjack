@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 from kivy.app import App
 from kivy.graphics import Color, Line
@@ -152,7 +152,16 @@ class RotatedCardImage(CardImage):
 
 
 class InsuranceLabel(Label):
-    pass
+    _color = None
+
+    def __init__(self, result: Literal[-1, 0, 1] = 0, *args, **kwargs):
+        if result == 0:
+            self._color = 0, 0, 1, 1
+        elif result == 1:
+            self._color = 0, 1, 0, 1
+        else:
+            self._color = 1, 0, 0, 1
+        super().__init__(*args, **kwargs)
 
 
 class HandWidget(Widget):
@@ -322,6 +331,7 @@ class PlayerHand(HandWidget):
         if self.hand_play.insurance:
             self.add_widget(
                 InsuranceLabel(
+                    result=self.hand_play.insurance_result,
                     text="I",
                     center=(
                         self.center[0] - self.size[0] / 2 - self.offset[1] * 1.5,
