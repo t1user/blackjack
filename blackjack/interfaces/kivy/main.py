@@ -187,7 +187,7 @@ class HandWidget(Widget):
             )
         self.add_widget(
             Label(
-                text=self.hand.value_str(),
+                text=self.points_value_str(),
                 center=self._label_position(image, i),
                 font_size=self.image_height * 0.15,
             )
@@ -201,6 +201,9 @@ class HandWidget(Widget):
 
     def _label_position(self, image: Image, n=0):
         return image.center[0], image.top + image.height * 0.1
+
+    def points_value_str(self) -> str:
+        return self.hand.value_str()
 
 
 class PlayerHand(HandWidget):
