@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 from abc import ABC, abstractmethod
+from ast import TypeAlias
 from dataclasses import dataclass, field
 from enum import Enum, Flag, auto
 from functools import cached_property, partial, reduce, wraps
@@ -275,7 +276,7 @@ class Hand(list[Card]):
         else:
             return (self < other) or (self == other)
 
-    def __iadd__(self, card: Card) -> Self:  # type: ignore
+    def __iadd__(self, card: Card) -> Self:
         self.append(card)
         return self
 
@@ -284,19 +285,19 @@ class Hand(list[Card]):
 
     __repr__ = __str__
 
-    def __setitem__(self, index, item):
+    def __setitem__(self, index: int, item: Card) -> None:
         super().__setitem__(index, item)
         self.newCardEvent.publish(item, self)
 
-    def insert(self, index, item):
+    def insert(self, index: int, item: Card) -> None:
         super().insert(index, item)
         self.newCardEvent.publish(item, self)
 
-    def extend(self, other):
+    def extend(self, other: list[Card]) -> None:
         super().extend(other)
         self.newCardEvent.publish(other, self)
 
-    def append(self, item):
+    def append(self, item: Card) -> None:
         super().append(item)
         self.newCardEvent.publish(item, self)
 
@@ -483,6 +484,7 @@ class State(Enum):
 
 D = TypeVar("D", YesNoDecision, PlayDecision)
 
+# represents every type that can be a result of evaluating a play decision
 type R = Sequence[HandPlay] | HandPlay | State
 
 
@@ -876,6 +878,9 @@ class TablePlay:
         return f"TablePlay(hands={self.hands})"
 
 
+DecisionCallable = Callable[[YesNoDecision | PlayDecision], None | R]
+
+
 class DecisionHandler:
     newDecisionEven = PubSubDecorator()
 
@@ -889,7 +894,7 @@ class DecisionHandler:
         self.next_step = next_step
         self.decision = decision
 
-        self._decision_callable: Decision | None = None
+        self._decision_callable: DecisionCallable | None = None
 
         self.decision_function = decision.callable
         self.choices = decision.choices
@@ -901,12 +906,14 @@ class DecisionHandler:
         return self._decision_callable
 
     @decision_callable.setter
-    def decision_callable(self, decision: Decision | None):
+    def decision_callable(self, decision: DecisionCallable | None):
         self._decision_callable = decision
         self.newDecisionEven.publish(self)
 
     @classmethod
-    def from_gen(cls, gen: Generator, next_step: Callable) -> Self | None:
+    def from_gen(
+        cls, gen: Generator, next_step: Callable[[], None | Generator]
+    ) -> Self | None:
         try:
             decision_tuple = next(gen)
         except StopIteration:
@@ -914,17 +921,19 @@ class DecisionHandler:
         else:
             return cls(gen, next_step, decision_tuple)
 
-    def __call__(self, decision: D) -> None:
+    def __call__(self, decision: YesNoDecision | PlayDecision) -> None:
         assert self.decision_callable is not None
         self.decision_callable(decision)
 
     def make_callable(self):
 
-        def inner(decision: D) -> None:
+        def inner(decision: YesNoDecision | PlayDecision) -> None:
             self.choices = None
             self.decision_callable = None
             try:
-                next_decision_tuple = self.gen.send(self.decision_function(decision))
+                next_decision_tuple = self.gen.send(
+                    self.decision_function(decision)  # type: ignore
+                )
             except StopIteration:
                 self.next_step()
             else:
