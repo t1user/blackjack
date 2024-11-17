@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import random
 from abc import ABC, abstractmethod
-from ast import TypeAlias
 from dataclasses import dataclass, field
 from enum import Enum, Flag, auto
 from functools import cached_property, partial, reduce, wraps
