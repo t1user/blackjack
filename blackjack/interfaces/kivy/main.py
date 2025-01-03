@@ -487,8 +487,8 @@ class Screen(BoxLayout):
         shoe = self.game.dealer.shoe
         self.shoe.text = (
             f"DECKS: "
-            f"{(len(shoe)-shoe._cut_card)/52:.1f} "
-            f"{'SHUFFLE' if shoe.will_shuffle else ''}"
+            f"{len(shoe)/52:.1f} "
+            f"{'SHUFFLE' if shoe.will_shuffle else '({:.1f})'.format(shoe._cut_card/52)}"
         )
         self.bet_size.max_bet = cash
         self.playarea.update()
